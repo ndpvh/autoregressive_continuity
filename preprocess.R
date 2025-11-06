@@ -24,18 +24,18 @@ data <- data %>%
         condition = questionListName, 
         time_start = timeStampStart, 
         time_stop = timeStampStop, 
-        ontspannen = ontspannen_sliderNegPos, 
-        gefrustreerd = gefrustreerd_sliderNegPos,
-        droevig = droevig_sliderNegPos, 
-        rustig = rustig_sliderNegPos,
-        gestresseerd = gestresseerd_sliderNegPos,
-        enthousiast = enthousiast_sliderNegPos,
-        verveeld = verveeld_sliderNegPos,
-        neerslachtig = neerslachtig_sliderNegPos,
-        blij = blij_sliderNegPos,
-        opgewekt = opgewekt_sliderNegPos,
-        tevreden = tevreden_sliderNegPos,
-        angstig = angstig_sliderNegPos
+        relaxed = ontspannen_sliderNegPos, 
+        frustrated = gefrustreerd_sliderNegPos,
+        sad = droevig_sliderNegPos, 
+        at_ease = rustig_sliderNegPos,
+        stressed = gestresseerd_sliderNegPos,
+        enthusiastic = enthousiast_sliderNegPos,
+        bored = verveeld_sliderNegPos,
+        somber = neerslachtig_sliderNegPos,
+        happy = blij_sliderNegPos,
+        elated = opgewekt_sliderNegPos,
+        content = tevreden_sliderNegPos,
+        anxious = angstig_sliderNegPos
     ) 
 
 # Compute time intervals per person per beep. Importantly, NAs should be 
