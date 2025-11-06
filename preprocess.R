@@ -87,3 +87,5 @@ data <- data |>
         time_stop,
         where(\(x) !is.POSIXt(x) && any(!is.na(x)) && any(x != ""))
     )
+
+#test
