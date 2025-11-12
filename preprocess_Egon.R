@@ -23,6 +23,7 @@ data <- data %>%
 data <- data %>%
     dplyr::select(
         connectionId,
+        scheduledBeepId,
         questionListName, # Questionnaire and condition
         timeStampStart,
         timeStampStop,
@@ -31,6 +32,7 @@ data <- data %>%
     dplyr::rename(
         id = connectionId,
         condition = questionListName,
+        scheduledBeep = scheduledBeepId,
         time_start = timeStampStart,
         time_stop = timeStampStop,
         relaxed = ontspannen_sliderNegPos,
@@ -60,10 +62,14 @@ data <- data %>%
         )
     )
 
+data %>%
+    group_by(id, condition) %>%
+    summarise(beeps = n())
 
-#Sort the data before starting
+# Sort the data: because time_start does not allow us to sort the missed beeps into the right order, we would need to sort by scheduled beep. But this does not wor because the mood and mood_followup
+# are not continuous in their scheduled beep ids. So we need to first
 data <- data %>%
-    arrange(id, time_start)
+    arrange(id)
 
 # Data from m-Path is already in the time zone of the participant, probably Europe/Brussels.
 # Thus, these timestamps are _not_ UNIX timestamps (as they are in UTC), but rather the number of
@@ -130,7 +136,7 @@ data <- data %>%
 data <- data %>%
     group_by(id, day.no) %>%
     mutate(
-        time_interval = time_length(time_start - lag(time_start), "mins"),
+        time_interval = time_length(time_stop - lag(time_stop), "mins"),
         .after = time_stop
     )
 
@@ -191,12 +197,17 @@ dataset_beeps =
 
 write.csv(
     dataset_followups,
-    file = file.path("data", "dataset_short_interval"),
+    file = file.path("data_processed", "dataset_short_interval"),
     row.names = FALSE
 )
 
 write.csv(
     dataset_beeps,
-    file = file.path("data", "dataset_long_interval"),
+    file = file.path("data_processed", "dataset_long_interval"),
     row.names = FALSE
 )
+
+# To Do: Leo preeprocessing steps
+# figuring out intervals,
+# proposing how to split the datasets
+# decision rules for follow up vs non follow up
