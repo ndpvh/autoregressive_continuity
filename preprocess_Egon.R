@@ -21,14 +21,14 @@ data <- data %>%
 
 # Select only the columns that we are interested in
 data <- data %>%
-    dplyr::select(
-        connectionId,
-        scheduledBeepId,
-        questionListName, # Questionnaire and condition
-        timeStampStart,
-        timeStampStop,
-        ontspannen_sliderNegPos:angstig_sliderNegPos
-    ) %>%
+    # dplyr::select(
+    #     connectionId,
+    #     scheduledBeepId,
+    #     questionListName, # Questionnaire and condition
+    #     timeStampStart,
+    #     timeStampStop,
+    #     ontspannen_sliderNegPos:angstig_sliderNegPos
+    #) %>%
     dplyr::rename(
         id = connectionId,
         condition = questionListName,
@@ -106,10 +106,11 @@ data <- data %>%
         date = as_date(time_start),
         onbeep.mins = time_length(time_stop - time_start, "mins"),
         .after = "id"
-    )
+    ) 
 
 # Add `day.no` to represent the current day in their study for each `id`
 data <- data %>%
+  filter(!is.na(date)) %>%
     group_by(id) %>%
     nest() %>%
     mutate(data = map(data, ~ group_by(., date))) %>%
@@ -129,6 +130,14 @@ data <- data %>%
 data <- data %>%
     mutate(missed = is.na(time_start))
 
+freqtable = data %>% 
+  group_by(id) %>%
+  summarise(
+    total_eeps = n(),
+    days = max(day.no)
+  ) 
+
+table(freqtable$days)
 
 # Compute time intervals per person per beep. Importantly, NAs should be
 # accounted for as well in consecutive time intervals: They will be deleted
@@ -197,13 +206,13 @@ dataset_beeps =
 
 write.csv(
     dataset_followups,
-    file = file.path("data_processed", "dataset_short_interval"),
+    file = file.path("data_processed", "dataset_dejonckheere_short_interval"),
     row.names = FALSE
 )
 
 write.csv(
     dataset_beeps,
-    file = file.path("data_processed", "dataset_long_interval"),
+    file = file.path("data_processed", "dataset_dejonckheere_long_interval"),
     row.names = FALSE
 )
 
