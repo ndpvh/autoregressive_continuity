@@ -97,7 +97,8 @@ data <- data %>%
     dplyr::select(
         id:time_stop,
         where(\(x) !is.POSIXt(x) && any(!is.na(x)) && any(x != ""))
-    )
+    ) %>%
+    select(-timeStampSent)
 
 # Create the date, and the total beep duration.
 data <- data %>%
@@ -106,11 +107,11 @@ data <- data %>%
         date = as_date(time_start),
         onbeep.mins = time_length(time_stop - time_start, "mins"),
         .after = "id"
-    ) 
+    )
 
 # Add `day.no` to represent the current day in their study for each `id`
 data <- data %>%
-  filter(!is.na(date)) %>%
+    filter(!is.na(date)) %>% # filter is NA
     group_by(id) %>%
     nest() %>%
     mutate(data = map(data, ~ group_by(., date))) %>%
@@ -130,12 +131,12 @@ data <- data %>%
 data <- data %>%
     mutate(missed = is.na(time_start))
 
-freqtable = data %>% 
-  group_by(id) %>%
-  summarise(
-    total_eeps = n(),
-    days = max(day.no)
-  ) 
+freqtable = data %>%
+    group_by(id) %>%
+    summarise(
+        total_eeps = n(),
+        days = max(day.no)
+    )
 
 table(freqtable$days)
 
@@ -154,7 +155,6 @@ data %>%
     ggplot2::ggplot(aes(x = time_interval)) +
     ggplot2::geom_histogram(bins = 100)
 
-
 data %>%
     filter(condition == "followup") %>%
     ggplot2::ggplot(aes(x = time_interval)) +
@@ -169,34 +169,101 @@ data %>%
         sd_interval = sd(time_interval, na.rm = TRUE)
     )
 
-## Do we need a differentiation for follow up and non_followup ?
-# Determine the condition based on the time interval
-data <- data %>%
-    group_by(id, day.no) %>%
-    mutate(
-        pair = case_when(
-            time_interval < 20 ~ "followup_pair",
-            time_interval >= 45 & time_interval < 120 ~ "non_followup_pair",
-            .default = NA_character_
-        ),
-        .after = condition
-    )
+## Add NA's
 
+dataset_followups = add_nas(
+    dat = data,
+    id = "id",
+    min_diff = 1,
+    max_diff = 20,
+    time_units = "mins",
+    time_var = "time_start"
+)
 
-## Finding the pairs
-dataset_followups =
-    add_nas(
-        dat = data,
-        id = "id",
-        min_diff = 1,
-        max_diff = 20,
-        time_units = "mins",
-        time_var = "time_start"
-    )
+# =========================================================================
+# Filter Function to remove mood that is seen as followup
+# Does: Insert NA Rows When Mood Comes Too Soon After Followup
+# =========================================================================
+
+insert_na_for_mood_timing <- function(df, min_minutes = 45) {
+    result_df <- df
+
+    # Find all mood rows that violate timing
+    for (i in nrow(result_df):2) {
+        # Start from bottom, go backwards
+
+        curr_row <- result_df[i, ]
+
+        # Skip if current row is NA
+        if (is.na(curr_row$condition)) {
+            next
+        }
+
+        # Skip if current is not "mood"
+        if (curr_row$condition != "mood") {
+            next
+        }
+
+        # Find previous non-NA row
+        prev_idx <- NA
+        for (j in (i - 1):1) {
+            if (!is.na(result_df$condition[j])) {
+                prev_idx <- j
+                break
+            }
+        }
+
+        # Skip if no previous row found
+        if (is.na(prev_idx)) {
+            next
+        }
+
+        prev_row <- result_df[prev_idx, ]
+
+        # Check if previous was "followup"
+        if (prev_row$condition != "followup") {
+            next
+        }
+
+        # Check if time difference < 45 minutes
+        minutes_diff <- as.numeric(
+            difftime(curr_row$time, prev_row$time, units = "mins")
+        )
+
+        if (minutes_diff >= min_minutes) {
+            next
+        }
+
+        # Create NA row
+        na_row <- result_df[i, ]
+        na_row[1, ] <- NA
+        na_row$id <- result_df$id[i]
+        na_row$time_lag <- prev_row$time
+
+        # Insert before current row
+        result_df <- bind_rows(
+            result_df[1:(i - 1), ],
+            na_row,
+            result_df[i:nrow(result_df), ]
+        )
+    }
+
+    # Recalculate row_id
+    result_df <- result_df %>%
+        mutate(row_id = row_number())
+
+    cat("✓ Done\n")
+    return(result_df)
+}
+
+dataset_followups = insert_na_for_mood_timing(
+    dataset_followups,
+    min_minutes = 45
+)
 
 dataset_beeps =
     add_nas(
-        dat = data,
+        dat = data %>% filter(condition == "mood"), ## filter out followups here
         id = "id",
         min_diff = 45,
         max_diff = 175,
@@ -215,8 +282,3 @@ write.csv(
     file = file.path("data_processed", "dataset_dejonckheere_long_interval"),
     row.names = FALSE
 )
-
-# To Do: Leo preeprocessing steps
-# figuring out intervals,
-# proposing how to split the datasets
-# decision rules for follow up vs non follow up
