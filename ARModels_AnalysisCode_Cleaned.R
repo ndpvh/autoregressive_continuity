@@ -50,13 +50,16 @@ cloos_combined = rbind(cloos_short, cloos_long)
 
 cloos_combined = cloos_combined %>%
   dplyr::select(condition, id, beep.no, burst.no, beep_pa, burst_pa,
-                beep_na, burst_na) %>%
+                beep_na, burst_na, time_interval) %>%
   rowwise() %>%
   mutate(response.no = coalesce(beep.no, burst.no),
          pa = coalesce(beep_pa, burst_pa),
          na = coalesce(beep_na, burst_na)) %>%
   ungroup() %>%
-  dplyr::select(condition, id, response.no, pa, na)
+  dplyr::select(condition, id, response.no, pa, na, time_interval) %>% 
+  dplyr::mutate(condition = ifelse(condition == "burst", 
+                                   "shortinterval", 
+                                   "longinterval"))
 
 ### Subset Egon's data for run_ar1_function
 
@@ -64,10 +67,15 @@ dejonckheere_longinterval$intervalcondition = "longinterval"
 dejonckheere_shortinterval$intervalcondition = "shortinterval"
 
 dejonckheere_longinterval = dejonckheere_longinterval %>%
-  dplyr::select(id, relaxed:anxious, intervalcondition)
+  dplyr::select(id, relaxed:anxious, intervalcondition, delta)
 
 dejonckheere_shortinterval = dejonckheere_shortinterval %>%
-  dplyr::select(id, relaxed:anxious, intervalcondition)
+  dplyr::select(id, relaxed:anxious, intervalcondition, delta)
+
+dejonckheere_fulldata = rbind(dejonckheere_longinterval,
+                              dejonckheere_shortinterval) |>
+  dplyr::rename(time_interval = delta,
+                condition = intervalcondition)
 
 #### Run Autoregressive Models ####
 
@@ -79,11 +87,13 @@ dejonckheere_shortinterval = dejonckheere_shortinterval %>%
 run_ar1_model = function(dataset, idcol, itemcol){
   
   dataset_lagged = dataset %>%
-    dplyr::select(condition, response) %>%
+    dplyr::select(condition, response, time_interval) %>%
     fill(condition, .direction = "updown") %>%
     mutate("response_lagged" = dplyr::lag(response))
-  
-  number_usable = sum(!is.na(dataset_lagged$response) & !is.na(dataset_lagged$response_lagged))
+
+  idx <- !is.na(dataset_lagged$response) & !is.na(dataset_lagged$response_lagged)
+  number_usable = sum(idx)
+  time_interval <- mean(dataset_lagged$time_interval[idx], na.rm = TRUE) # Note that na.rm is only necessary for Leonie's data: Not sure what's happening there
   
   ar1_model_lm = try(lm(as.formula("response ~ response_lagged"), data = dataset_lagged))
   
@@ -119,7 +129,8 @@ run_ar1_model = function(dataset, idcol, itemcol){
                           "item" = unique(dataset[ , itemcol]), 
                           "condition" = unique(dataset_lagged[ , "condition"]),
                           "ar_lm" = ar1_lm_parameter, "ar_arima" = ar1_arima_parameter,
-                          "number_usable_pairs" = number_usable)
+                          "number_usable_pairs" = number_usable,
+                          "time_interval" = time_interval)
   
   return(results_df)
   
@@ -128,11 +139,15 @@ run_ar1_model = function(dataset, idcol, itemcol){
 ### Run on PACE Dataset ####
 
 pace_esm_analysis = pace_esm %>%
-  dplyr::select(session, condition, n_day, n_survey_per_day, 
+  dplyr::select(session, condition, n_day, n_survey_per_day, delta,
          soci, asse, acti, trus, kind,
          poli, crea, curi, arti, lazy, orga, reli, irri,
          rela, care, hung, tire, happ, stres) %>%
-  pivot_longer(cols = names(.)[-c(1:4)], names_to = "item",
+  dplyr::rename(time_interval = delta) %>% 
+  dplyr::mutate(condition = ifelse(condition == "A", 
+                                   "shortinterval", 
+                                   "longinterval")) %>% 
+  pivot_longer(cols = names(.)[-c(1:5)], names_to = "item",
                values_to = "response")
 
 pace_ar_datasets = pace_esm_analysis %>%
@@ -174,11 +189,6 @@ save(
 )
 
 #### Run on Egon's Dataset ####
-
-dejonckheere_fulldata = rbind(dejonckheere_longinterval,
-                              dejonckheere_shortinterval)
-
-names(dejonckheere_fulldata)[ncol(dejonckheere_fulldata)] = "condition"
 
 dejonckheere_fulldata = dejonckheere_fulldata %>%
   pivot_longer(cols = relaxed:anxious, names_to = "item", 
