@@ -10,24 +10,26 @@ load(file.path("results", "ar_estimates", "EgonData_ARParameterEstimates.RData")
 
 #### Compare AR Estimates B/w Short and Long Intervals ####
 
-# B = 4x/day (longer interval), A = 8x/day (shorter interval)
-pace_arresults_full = pace_arresults_full %>%
-  mutate("intervalcondition" = case_when(
-    condition == "B" ~ "longinterval",
-    condition == "A" ~ "shortinterval",
-    TRUE ~ NA_character_
-  ))
+# Changed this in the original file
+#
+# # B = 4x/day (longer interval), A = 8x/day (shorter interval)
+# pace_arresults_full = pace_arresults_full %>%
+#   mutate("condition" = case_when(
+#     condition == "B" ~ "longinterval",
+#     condition == "A" ~ "shortinterval",
+#     TRUE ~ NA_character_
+#   ))
 
-# Beep = long interval, Burst = short interval
+# # Beep = long interval, Burst = short interval
 
-cloos_arresults_full = cloos_arresults_full %>%
-  mutate("intervalcondition" = case_when(
-    condition == "beep" ~ "longinterval",
-    condition == "burst" ~ "shortinterval",
-    TRUE ~ NA_character_
-  ))
+# cloos_arresults_full = cloos_arresults_full %>%
+#   mutate("condition" = case_when(
+#     condition == "beep" ~ "longinterval",
+#     condition == "burst" ~ "shortinterval",
+#     TRUE ~ NA_character_
+#   ))
 
-dejonckheere_arresults_full$intervalcondition = dejonckheere_arresults_full$condition
+# dejonckheere_arresults_full$condition = dejonckheere_arresults_full$condition
 
 intervalcomparison_function = function(dataset, paired){
   
@@ -36,34 +38,38 @@ intervalcomparison_function = function(dataset, paired){
   # paired is TRUE/FALSE statement for whether the data are paired
   
   ar_summarystats = dataset %>%
-    group_by(intervalcondition) %>%
+    group_by(condition) %>%
     summarise("ARMean" = mean(ar_arima, na.rm = TRUE),
-              "ARSD" = sd(ar_arima, na.rm = TRUE)) %>%
-    pivot_wider(names_from = intervalcondition,
-                values_from = c(ARMean, ARSD))
+              "ARSD" = sd(ar_arima, na.rm = TRUE),
+              "time_interval" = mean(time_interval, na.rm = TRUE)) %>%
+    pivot_wider(names_from = condition,
+                values_from = c(ARMean, ARSD, time_interval))
   
-  expected_mean = ar_summarystats$ARMean_shortinterval^2
+  exponent <- ar_summarystats$time_interval_longinterval / ar_summarystats$time_interval_shortinterval
+  expected_mean = ar_summarystats$ARMean_shortinterval^exponent
   
   if(paired){
-    
+
     dataset = dataset %>%
-      pivot_wider(id_cols = c(id, item), names_from = intervalcondition,
+      pivot_wider(id_cols = c(id, item), names_from = condition,
                   values_from = ar_arima)
     
-    ttest_pvalue = t.test(dataset$longinterval,
+    ttest_pvalue = tryCatch(t.test(dataset$longinterval,
                           dataset$shortinterval,
-                          paired = TRUE)$p.value
+                          paired = TRUE)$p.value,
+                          error = function(e) NA)
     
     # also compare to the square of the short interval
     
     dataset = dataset %>%
       rowwise() %>%
-      mutate(expected_ar = shortinterval^2) %>%
+      mutate(expected_ar = shortinterval^exponent) %>%
       ungroup()
     
-    expectedar_comparison = t.test(dataset$longinterval,
+    expectedar_comparison = tryCatch(t.test(dataset$longinterval,
                                    dataset$expected_ar,
-                                   paired = TRUE)$p.value
+                                   paired = TRUE)$p.value, 
+                                   error = function(e) NA)
     
     results = cbind(data.frame(item = unique(dataset[ , "item"]),
                                interval_comparison = ttest_pvalue,
@@ -74,14 +80,14 @@ intervalcomparison_function = function(dataset, paired){
     
     # independent samples
     
-    ttest_pvalue = t.test(ar_arima ~ intervalcondition,
+    ttest_pvalue = t.test(ar_arima ~ condition,
                              data = dataset)$p.value
     
     # it could be that the average AR estimates are sig
     # different from each other, but the AR estimate for
     # the long interval is not what we would expect (square of phi_shortinterval)
     
-    expectedar_comparison = t.test(dataset$ar_arima[dataset$intervalcondition == "longinterval"],
+    expectedar_comparison = t.test(dataset$ar_arima[dataset$condition == "longinterval"],
                               mu = expected_mean)$p.value
     
     results = cbind(data.frame(item = unique(dataset[ , "item"]),
@@ -153,7 +159,7 @@ dejonckheere_intervalcomparisons %>%
                                    arsquared_comparison >= .05 ~ 0,
                                   TRUE ~ NA_real_)) %>%
   ungroup() %>%
-  summarise(sum(intervalcomparison_sig), sum(arsquared_sig))
+  summarise(sum(intervalcomparison_sig), sum(arsquared_sig, na.rm = TRUE))
 # out of 12 items
 # If only include participants with more than 25 timepoints,
 # then half items have different ar estimates across the intervals
@@ -163,7 +169,7 @@ dejonckheere_intervalcomparisons %>%
 ##### Comparisons Figure #####
 
 ggplot(data = pace_arresults_full,
-       aes(x = ar_arima, color = intervalcondition, fill = intervalcondition))+
+       aes(x = ar_arima, color = condition, fill = condition))+
   geom_density(alpha = 0.3)+
   facet_wrap(~ item)+
   theme_classic()+
@@ -173,11 +179,11 @@ ggplot(data = pace_arresults_full,
   labs(x = "AR Estimate", y = "Density", fill = "Interval Length",
        color = "Interval Length")
 
-ggsave("PACE_AREstimates_Visual.jpeg",
+ggsave(file.path("figures", "PACE_AREstimates_Visual.jpeg"),
        width = 10, height = 8)
 
 ggplot(data = cloos_arresults_full,
-       aes(x = ar_arima, color = intervalcondition, fill = intervalcondition))+
+       aes(x = ar_arima, color = condition, fill = condition))+
   geom_density(alpha = 0.3)+
   facet_wrap(~ item)+
   theme_classic()+
@@ -188,11 +194,11 @@ ggplot(data = cloos_arresults_full,
   labs(x = "AR Estimate", y = "Density", fill = "Interval Length",
        color = "Interval Length")
 
-ggsave("Cloos_AREstimates_Visual.jpeg",
+ggsave(file.path("figures", "Cloos_AREstimates_Visual.jpeg"),
        width = 8, height = 6)
 
 ggplot(data = dejonckheere_arresults_full,
-       aes(x = ar_arima, color = intervalcondition, fill = intervalcondition))+
+       aes(x = ar_arima, color = condition, fill = condition))+
   geom_density(alpha = 0.3)+
   facet_wrap(~ item)+
   theme_classic()+
@@ -203,12 +209,12 @@ ggplot(data = dejonckheere_arresults_full,
   labs(x = "AR Estimate", y = "Density", fill = "Interval Length",
        color = "Interval Length")
 
-ggsave("Dejonckheere_AREstimates_Visual.jpeg",
+ggsave(file.path("figures", "Dejonckheere_AREstimates_Visual.jpeg"),
        width = 10, height = 8)
 
 ggplot(data = pace_arresults_full %>% filter(item == "soci"),
-       aes(x = ar_arima, color = intervalcondition,
-           fill = intervalcondition))+
+       aes(x = ar_arima, color = condition,
+           fill = condition))+
   geom_density(alpha = 0.5)+
   geom_vline(xintercept = pace_intervalcomparisons$ARMean_longinterval[pace_intervalcomparisons$item == "soci"],
              color = "#9888A5")+
