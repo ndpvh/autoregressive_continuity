@@ -4,9 +4,9 @@ library(tidyverse)
 
 #### Read in AR Estimates ####
 
-load("PACE_ARParameterEstimates.RData") # pace_arresults_full
-load("CloosData_ARParameterEstimates.RData") # cloos_arresults_full
-load("EgonData_ARParameterEstimates.RData") # dejonckheere_arresults_full
+load(file.path("results", "ar_estimates", "PACE_ARParameterEstimates.RData")) # pace_arresults_full
+load(file.path("results", "ar_estimates", "CloosData_ARParameterEstimates.RData")) # cloos_arresults_full
+load(file.path("results", "ar_estimates", "EgonData_ARParameterEstimates.RData")) # dejonckheere_arresults_full
 
 #### Compare AR Estimates B/w Short and Long Intervals ####
 

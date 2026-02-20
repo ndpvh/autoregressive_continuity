@@ -4,13 +4,42 @@ library(ggpubr)# graphing
 
 #### Load in Data #### 
 
-pace_esm = read.csv("ESM_dat_processed_timelag.csv")
+pace_esm = read.csv(
+  file.path(
+    "data_processed",
+    "ESM_dat_processed_timelag.csv"
+  )
+)
 
-cloos_long = read.csv("dataset_cloos_beeps_long.txt", header = TRUE)
-cloos_short = read.csv("dataset_cloos_burst_short.txt", header = TRUE)
+cloos_long = read.csv(
+  file.path(
+    "data_processed",
+    "dataset_cloos_beeps_long.txt"
+  ), 
+  header = TRUE
+)
+cloos_short = read.csv(
+  file.path(
+    "data_processed",
+    "dataset_cloos_burst_short.txt"
+  ), 
+  header = TRUE
+)
 
-dejonckheere_longinterval = read.csv("dataset_dejonckheere_long_interval.txt")
-dejonckheere_shortinterval = read.csv("dataset_dejonckheere_short_interval.txt")
+dejonckheere_longinterval = read.csv(
+  file.path(
+    "data_processed",
+    "dataset_dejonckheere_long_interval.txt"
+  ), 
+  header = TRUE
+)
+dejonckheere_shortinterval = read.csv(
+  file.path(
+    "data_processed",
+    "dataset_dejonckheere_short_interval.txt"
+  ), 
+  header = TRUE
+)
 
 ## Subset Leonie's data so aligns with run_ar1_function
 
@@ -99,7 +128,7 @@ run_ar1_model = function(dataset, idcol, itemcol){
 ### Run on PACE Dataset ####
 
 pace_esm_analysis = pace_esm %>%
-  dplyr::select(session, condition, n_day, n_survey_per_day,
+  dplyr::select(session, condition, n_day, n_survey_per_day, 
          soci, asse, acti, trus, kind,
          poli, crea, curi, arti, lazy, orga, reli, irri,
          rela, care, hung, tire, happ, stres) %>%
@@ -115,7 +144,14 @@ pace_arresults_full = pace_esm_analysis %>%
   group_split(.keep = TRUE) %>%
   map_dfr( ~ run_ar1_model(., idcol = "session", itemcol = "item"))
 
-save(pace_arresults_full, file = "PACE_ARParameterEstimates.RData")
+save(
+  pace_arresults_full, 
+  file = file.path(
+    "results",
+    "ar_estimates",
+    "PACE_ARParameterEstimates.RData"
+  )
+)
 
 #### Run on Leonie's Dataset ####
 
@@ -128,7 +164,14 @@ cloos_arresults_full = cloos_combined %>%
   group_split(.keep = TRUE) %>%
   map_dfr( ~ run_ar1_model(., idcol = "id", itemcol = "item"))
 
-save(cloos_arresults_full, file = "CloosData_ARParameterEstimates.RData")
+save(
+  cloos_arresults_full, 
+  file = file.path(
+    "results",
+    "ar_estimates",
+    "CloosData_ARParameterEstimates.RData"
+  )
+)
 
 #### Run on Egon's Dataset ####
 
@@ -146,4 +189,11 @@ dejonckheere_arresults_full = dejonckheere_fulldata %>%
   group_split(.keep = TRUE) %>%
   map_dfr( ~ run_ar1_model(., idcol = "id", itemcol = "item"))
 
-save(dejonckheere_arresults_full, file = "EgonData_ARParameterEstimates.RData")
+save(
+  dejonckheere_arresults_full, 
+  file = file.path(
+    "results",
+    "ar_estimates",
+    "EgonData_ARParameterEstimates.RData"
+  )
+)
