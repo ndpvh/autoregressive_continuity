@@ -42,12 +42,12 @@ data <- data %>%
   group_by(id, date) %>%
   arrange(time, .by_group = TRUE) %>%
   mutate(
-    time_valid = if_else(missed, as.POSIXct(NA), time),
-    last_valid_time = zoo::na.locf(time_valid, na.rm = FALSE),
-    time_lag = lag(last_valid_time),
+    # time_valid = if_else(missed, as.POSIXct(NA), time),
+    # last_valid_time = zoo::na.locf(time_valid, na.rm = FALSE),
+    time_lag = lag(time),
     time_interval = if_else(
       missed,
-      NA_real_,
+      NA,
       as.numeric(difftime(time, time_lag, units = "mins"))
     )
   )
@@ -119,13 +119,13 @@ data %>%
   )
 
 write.csv(
-    data %>% filter(!is.na(burst.no)),
-    file = file.path("data_processed", "dataset_cloos_burst_short"),
-    row.names = FALSE
+  data %>% filter(!is.na(burst.no)),
+  file = file.path("data_processed", "dataset_cloos_burst_short"),
+  row.names = FALSE
 )
 
 write.csv(
-    data %>% filter(!is.na(beep.no)),
-    file = file.path("data_processed", "dataset_cloos_beeps_long"),
-    row.names = FALSE
+  data %>% filter(!is.na(beep.no)),
+  file = file.path("data_processed", "dataset_cloos_beeps_long"),
+  row.names = FALSE
 )
