@@ -252,7 +252,10 @@ data_fixlim_20_20 <- data_valid %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
 
-summary_fixlim <- summarize_and_save(data_fixlim, "fixed_limits_20_20")
+summary_fixlim_20_20 <- summarize_and_save(
+  data_fixlim_20_20,
+  "fixed_limits_20_20"
+)
 
 ### 20 and 60 minutes around the prompted time interval ####
 
@@ -268,7 +271,10 @@ data_fixlim_20_60 <- data_valid %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
 
-summary_fixlim <- summarize_and_save(data_fixlim, "fixed_limits_20_60")
+summary_fixlim_20_60 <- summarize_and_save(
+  data_fixlim_20_60,
+  "fixed_limits_20_60"
+)
 
 ## 3 * SD criterion ####
 
@@ -302,12 +308,23 @@ summary_boxpl <- summarize_and_save(data_boxpl, "IQR")
 
 overview_summary <- bind_rows(
   summary_nolim,
-  summary_fixlim,
+  summary_fixlim_20_20,
+  summary_fixlim_20_60,
   summary_3sd,
   summary_2sd,
   summary_boxpl
 ) %>%
   mutate(
-    rule = rep(c("no_limits", "fixlim", "3sd", "2sd", "boxplot"), each = 2)
+    rule = rep(
+      c(
+        "no_limits",
+        "fixed_limits_20_20",
+        "fixed_limits_20_60",
+        "3sd",
+        "2sd",
+        "boxplot"
+      ),
+      each = 2
+    )
   ) %>%
   select(rule, everything())
