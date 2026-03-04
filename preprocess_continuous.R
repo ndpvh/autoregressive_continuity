@@ -103,6 +103,7 @@ data_valid <- data_long_difftime %>%
 
 ### Function to apply outlier detection and filtering ####
 apply_limit_rule <- function(data, rule_fn, min_pairs) {
+  
   # Calculate bounds once per condition
   bounds_df <- data %>%
     group_by(condition) %>%
@@ -116,6 +117,7 @@ apply_limit_rule <- function(data, rule_fn, min_pairs) {
     ) %>%
     select(condition, lower_bound, upper_bound)
 
+
   # Apply bounds and filter
   data %>%
     left_join(bounds_df, by = "condition") %>%
@@ -128,7 +130,7 @@ apply_limit_rule <- function(data, rule_fn, min_pairs) {
     filter(all(n_valid_pairs >= min_pairs)) %>%
     ungroup() %>%
     select(-lower_bound, -upper_bound)
-}
+  }
 
 # Define limit rules ####
 sd_rule <- function(x, multiplier = 2, na.rm = TRUE) {
@@ -167,7 +169,7 @@ summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
     ) +
     scale_fill_brewer(palette = "Set1") +
     labs(
-      title = "Distribution of Time Intervals Between Prompts",
+      title = paste("Distribution of Time Intervals Between Prompts", rule_name),
       x = "Time interval (minutes)",
       y = "Count",
       fill = "Condition"
@@ -233,11 +235,22 @@ data_nolim <- data_valid %>%
 
 summary_nolim <- summarize_and_save(data_nolim, "no_limits")
 
+## fixed limits ###
+data_fixlim <- data_valid %>%
+  group_by(id, condition) %>%
+  filter((condition == "beep" & time_interval >= 80 & time_interval <= 200) | (condition == "burst" & time_interval >= 0 & time_interval <= 40)) %>%
+  mutate(n_valid_pairs = n()) |>
+  group_by(id) %>%
+  filter(all(n_valid_pairs >= min_pairs)) %>%
+  ungroup()
+
+summary_fixlim <- summarize_and_save(data_fixlim, "fixed limits")
+
 ## 3 * SD criterion ####
 
 data_3sd <- apply_limit_rule(
   data_valid,
-  function(x) sd_rule(x, multiplier = 3),
+  rule_fn = function(x) sd_rule(x, multiplier = 3),
   min_pairs
 )
 
@@ -261,13 +274,14 @@ data_boxpl <- apply_limit_rule(
   min_pairs
 )
 
-summary_boxpl <- summarize_and_save(data_boxpl, "boxplot")
+summary_boxpl <- summarize_and_save(data_boxpl, "IQR")
 
 overview_summary <- bind_rows(
   summary_nolim,
+  summary_fixlim,
   summary_3sd,
   summary_2sd,
   summary_boxpl
 ) %>%
-  mutate(rule = rep(c("no_limits", "3sd", "2sd", "boxplot"), each = 2)) %>%
+  mutate(rule = rep(c("no_limits", "fixlim", "3sd", "2sd", "boxplot"), each = 2)) %>%
   select(rule, everything())
