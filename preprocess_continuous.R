@@ -103,7 +103,6 @@ data_valid <- data_long_difftime %>%
 
 ### Function to apply outlier detection and filtering ####
 apply_limit_rule <- function(data, rule_fn, min_pairs) {
-  
   # Calculate bounds once per condition
   bounds_df <- data %>%
     group_by(condition) %>%
@@ -117,7 +116,6 @@ apply_limit_rule <- function(data, rule_fn, min_pairs) {
     ) %>%
     select(condition, lower_bound, upper_bound)
 
-
   # Apply bounds and filter
   data %>%
     left_join(bounds_df, by = "condition") %>%
@@ -130,7 +128,7 @@ apply_limit_rule <- function(data, rule_fn, min_pairs) {
     filter(all(n_valid_pairs >= min_pairs)) %>%
     ungroup() %>%
     select(-lower_bound, -upper_bound)
-  }
+}
 
 # Define limit rules ####
 sd_rule <- function(x, multiplier = 2, na.rm = TRUE) {
@@ -169,7 +167,10 @@ summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
     ) +
     scale_fill_brewer(palette = "Set1") +
     labs(
-      title = paste("Distribution of Time Intervals Between Prompts", rule_name),
+      title = paste(
+        "Distribution of Time Intervals Between Prompts",
+        rule_name
+      ),
       x = "Time interval (minutes)",
       y = "Count",
       fill = "Condition"
@@ -236,15 +237,38 @@ data_nolim <- data_valid %>%
 summary_nolim <- summarize_and_save(data_nolim, "no_limits")
 
 ## fixed limits ###
-data_fixlim <- data_valid %>%
+
+### 20 minutes around the prompted time interval ####
+
+# For beeps 120 - 160 min and for bursts 0 - 40
+data_fixlim_20_20 <- data_valid %>%
   group_by(id, condition) %>%
-  filter((condition == "beep" & time_interval >= 80 & time_interval <= 200) | (condition == "burst" & time_interval >= 0 & time_interval <= 40)) %>%
+  filter(
+    (condition == "beep" & time_interval >= 120 & time_interval <= 160) |
+      (condition == "burst" & time_interval >= 0 & time_interval <= 40)
+  ) %>%
   mutate(n_valid_pairs = n()) |>
   group_by(id) %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
 
-summary_fixlim <- summarize_and_save(data_fixlim, "fixed limits")
+summary_fixlim <- summarize_and_save(data_fixlim, "fixed_limits_20_20")
+
+### 20 and 60 minutes around the prompted time interval ####
+
+# for beeps 80 - 200 min and for bursts 0 - 40 min
+data_fixlim_20_60 <- data_valid %>%
+  group_by(id, condition) %>%
+  filter(
+    (condition == "beep" & time_interval >= 80 & time_interval <= 200) |
+      (condition == "burst" & time_interval >= 0 & time_interval <= 40)
+  ) %>%
+  mutate(n_valid_pairs = n()) |>
+  group_by(id) %>%
+  filter(all(n_valid_pairs >= min_pairs)) %>%
+  ungroup()
+
+summary_fixlim <- summarize_and_save(data_fixlim, "fixed_limits_20_60")
 
 ## 3 * SD criterion ####
 
@@ -283,5 +307,7 @@ overview_summary <- bind_rows(
   summary_2sd,
   summary_boxpl
 ) %>%
-  mutate(rule = rep(c("no_limits", "fixlim", "3sd", "2sd", "boxplot"), each = 2)) %>%
+  mutate(
+    rule = rep(c("no_limits", "fixlim", "3sd", "2sd", "boxplot"), each = 2)
+  ) %>%
   select(rule, everything())
