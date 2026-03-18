@@ -36,7 +36,7 @@ observations are further filtered that only participants that have at least 20 e
 - `time_stop`: sent questionnaire
 - `time_interval_original`: interval before inserting NAs
 - `time_interval`: time between effective pairs
-- `delta`: same as `time_interval` but computed by Anabel 
+- `delta`: same as `time_interval` but computed by Anabel's function 
 - `n_valid_paris`: participants pairs
 - `items`: items
 - `new_row_needed`: if row was inserted by add_na
