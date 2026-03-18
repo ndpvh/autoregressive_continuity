@@ -245,6 +245,8 @@ summary_nolim <- summarize_and_save(data_nolim, "no_limits")
 
 ### 20 minutes around the prompted time interval ####
 
+# CHOSEN APPROACH FOR MAIN ANALYSES
+
 # For beeps 120 - 160 min and for bursts 0 - 40
 data_fixlim_20_20 <- data_valid %>%
   group_by(id, condition) %>%
@@ -333,3 +335,38 @@ overview_summary <- bind_rows(
     )
   ) %>%
   select(rule, everything())
+
+# Subset data to 20 minutes around the prompted time interval ####
+
+data_final <- data_fixlim_20_20 %>%
+  select(
+    id,
+    connectionId,
+    date,
+    condition,
+    meas_no,
+    time,
+    time_lag,
+    time_interval,
+    na,
+    na_lag,
+    pa,
+    pa_lag
+  )
+
+data_final_burst <- data_final %>%
+  filter(condition == "burst")
+data_final_beep <- data_final %>%
+  filter(condition == "beep")
+
+write.csv(
+  data_final_burst,
+  file.path("data_processed", "dataset_cloos_burst_short.txt"),
+  row.names = FALSE
+)
+
+write.csv(
+  data_final_beep,
+  file.path("data_processed", "dataset_cloos_beep_long.txt"),
+  row.names = FALSE
+)
