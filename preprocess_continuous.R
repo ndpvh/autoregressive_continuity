@@ -1,11 +1,16 @@
 ################################################################################
-# CONTINUOUS -- LEONIE
+# Title: Processing of Leonie's data
+#
+# Description:
+# This script processes the data from Cloos et al., 2024 & 2025, applying various outlier
+# detection methods to the time intervals between prompts.
+#
+# Authors: Leonie Cloos & Peer-Ole Jacobsen
 ################################################################################
 
 # Set Up ####
 
 library(tidyverse)
-library(zoo)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -25,7 +30,7 @@ data <- data %>%
 # reshape data to some kind of long format and assign measurement count (within condition)
 # exclude beeps that are faulty as being answerd in the wrong direction by participants
 # (e.g., frist beep 6 than beep 5) and only keep first (timewise)
-data_long <- data %>%
+data <- data %>%
   mutate(
     condition = if_else(
       is.na(beep.no),
@@ -42,17 +47,17 @@ data_long <- data %>%
       beep_pa,
       burst_pa
     )
-  ) |>
-  arrange(id, time) |>
+  ) %>%
+  arrange(id, time) %>%
   group_by(id, date, condition) %>%
   mutate(
     meas_no = as.integer(as.factor(time)),
     test = beep.no - meas_no
-  ) |>
-  filter(test != -1 | is.na(test)) |>
+  ) %>%
+  filter(test != -1 | is.na(test)) %>%
   mutate(
     meas_no = as.integer(as.factor(time)),
-  ) |>
+  ) %>%
   select(
     id,
     connectionId,
@@ -63,7 +68,7 @@ data_long <- data %>%
     missed,
     na,
     pa
-  ) |>
+  ) %>%
   arrange(id, condition, time)
 
 # minimum no of valid paris per person and condition
@@ -73,7 +78,7 @@ min_pairs <- 20
 
 # compute lagged values of missing, PA, and NA to identify valid pairs of consecutive prompts
 # compute time intervals between valid pairs of consecutive prompts (i.e., both prompts not missed) and store in new variable time_interval
-data_long_difftime <- data_long %>%
+data_difftime <- data %>%
   group_by(id, date, condition) %>%
   mutate(
     time_lag = lag(time),
@@ -96,7 +101,7 @@ data_long_difftime <- data_long %>%
 
 # Limits to time intervals ####
 
-data_valid <- data_long_difftime %>%
+data_valid <- data_difftime %>%
   filter(valid_pair)
 
 ## Functions ####
@@ -123,7 +128,7 @@ apply_limit_rule <- function(data, rule_fn, min_pairs) {
       time_interval >= lower_bound & time_interval <= upper_bound
     ) %>%
     group_by(id, condition) %>%
-    mutate(n_valid_pairs = n()) |>
+    mutate(n_valid_pairs = n()) %>%
     group_by(id) %>%
     filter(all(n_valid_pairs >= min_pairs)) %>%
     ungroup() %>%
@@ -150,7 +155,7 @@ iqr_rule <- function(x, multiplier = 1.5, na.rm = TRUE) {
 }
 
 # Function to generate summary and save outputs ####
-summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
+summarize_and_save <- function(data, rule_name, figure_dir = "figures/cloos") {
   # Create figures directory if it doesn't exist
   if (!dir.exists(figure_dir)) {
     dir.create(figure_dir, showWarnings = FALSE, recursive = TRUE)
@@ -194,7 +199,7 @@ summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
   )
 
   # Generate summary statistics
-  summary_intervals <- data |>
+  summary_intervals <- data %>%
     summarise(
       min_interval = min(time_interval, na.rm = TRUE),
       mean_interval = mean(time_interval, na.rm = TRUE),
@@ -214,7 +219,7 @@ summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
       max_pairs = max(n_valid_pairs)
     )
 
-  n_participants <- data |>
+  n_participants <- data %>%
     summarise(n_participants = n_distinct(id), .by = condition)
 
   # Combine all summaries
@@ -229,7 +234,7 @@ summarize_and_save <- function(data, rule_name, figure_dir = "figures") {
 
 data_nolim <- data_valid %>%
   group_by(id, condition) %>%
-  mutate(n_valid_pairs = n()) |>
+  mutate(n_valid_pairs = n()) %>%
   group_by(id) %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
@@ -247,7 +252,7 @@ data_fixlim_20_20 <- data_valid %>%
     (condition == "beep" & time_interval >= 120 & time_interval <= 160) |
       (condition == "burst" & time_interval >= 0 & time_interval <= 40)
   ) %>%
-  mutate(n_valid_pairs = n()) |>
+  mutate(n_valid_pairs = n()) %>%
   group_by(id) %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
@@ -266,7 +271,7 @@ data_fixlim_20_60 <- data_valid %>%
     (condition == "beep" & time_interval >= 80 & time_interval <= 200) |
       (condition == "burst" & time_interval >= 0 & time_interval <= 40)
   ) %>%
-  mutate(n_valid_pairs = n()) |>
+  mutate(n_valid_pairs = n()) %>%
   group_by(id) %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
   ungroup()
