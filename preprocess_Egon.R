@@ -49,8 +49,8 @@ data <- data %>%
         anxious = angstig_sliderNegPos
     )
 
-# M-path questionnaire names need to be changed (followup in m-path means that in that questionnaire there is a follow up item;
-# but this means that in this questionnaire there is an item indicating that the "mood" questionnaire needs to be triggered the next time)
+# M-path questionnaire names need to be changed (followup in m-path means that withinin that questionnaire there is a follow up item;
+# this means that in this questionnaire there is an item indicating that the "mood" questionnaire needs to be triggered the next time)
 # so Mood is actually the follow up
 data <- data %>%
     mutate(
@@ -66,12 +66,13 @@ data %>%
     group_by(id, condition) %>%
     summarise(beeps = n())
 
-# Sort the data: because time_start does not allow us to sort the missed beeps into the right order, we would need to sort by scheduled beep. But this does not wor because the mood and mood_followup
-# are not continuous in their scheduled beep ids. So we need to first
+# Sort the data: Problem that msised beeps dont ahve a timestamp sent and timestamp start is of course empty. So time_start does not allow us to sort the missed beeps into the right order, they are actually useless.
+# The missed beeps will just be at bottom of each persons data
+
 data <- data %>%
     arrange(id)
 
-# Data from m-Path is already in the time zone of the participant, probably Europe/Brussels.
+# Data from m-Path is already in the time zone of the participant, Europe/Brussels.
 # Thus, these timestamps are _not_ UNIX timestamps (as they are in UTC), but rather the number of
 # seconds since 1970-01-01 compared to the participant's local time zone. Converting them leaves
 # them in UTC, which is not that problematic unless you combine it with other data.
@@ -131,18 +132,19 @@ data <- data %>%
 data <- data %>%
     mutate(missed = is.na(time_start))
 
+# ---- Inspect study duration ----
+# Note: some participants have 8-9 days despite planned 7, reason unknown
 freqtable = data %>%
     group_by(id) %>%
     summarise(
-        total_eeps = n(),
+        total_beeps = n(),
         days = max(day.no)
     )
 
 table(freqtable$days)
 
-# Compute time intervals per person per beep. Importantly, NAs should be
-# accounted for as well in consecutive time intervals: They will be deleted
-# afterwards
+
+# Compute time intervals per person per beep.
 data <- data %>%
     group_by(id, day.no) %>%
     mutate(
@@ -169,23 +171,74 @@ data %>%
         sd_interval = sd(time_interval, na.rm = TRUE)
     )
 
-## Add NA's
+# =============================================================================
+# INSERT NA BREAKS
+# NA rows are inserted to prevent lag time from being computed across invalid
+# gaps. When lag() hits an NA row it returns NA for the next row, breaking
+# the pair.
+# 
+# Goes through all rows and inserts an NA row when the time gap between two consecutive beeps is either less than 1 minute (too fast, probably a duplicate) or more than 20 minutes
+# (too long, the pair is too far apart to be meaningful). The NA row acts as a break — it prevents a lag time from being computed across that gap later.
+# =============================================================================
 
-dataset_followups = add_nas(
-    dat = data,
-    id = "id",
-    min_diff = 1,
-    max_diff = 20,
+add_nas <- function(
+    dat,
+    id,
+    min_diff,
+    max_diff,
     time_units = "mins",
-    time_var = "time_start"
-)
+    time_var,
+    alter_time_var = NULL
+) {
+    # 1) Standardize names once
+    names(dat)[names(dat) == id] <- "id"
+    names(dat)[names(dat) == time_var] <- "time"
+    if (!is.null(alter_time_var)) {
+        names(dat)[names(dat) == alter_time_var] <- "alter_time"
+        dat$time <- if_else(is.na(dat$time), dat$alter_time, dat$time)
+    }
 
-# =========================================================================
-# Filter Function to remove mood that is seen as followup
-# Does: Insert NA Rows When Mood Comes Too Soon After Followup
-# =========================================================================
+    # 2) Compute deltas and flags
+    dat <- dat %>%
+        arrange(id, time) %>%
+        group_by(id) %>%
+        mutate(
+            row_id = row_number(),
+            time_lag = lag(time),
+            delta = as.numeric(difftime(time, time_lag, units = time_units)),
+            new_row_needed = !is.na(delta) &
+                (delta < min_diff | delta > max_diff)
+        ) %>%
+        ungroup()
 
-insert_na_for_mood_timing <- function(df, min_minutes = 45) {
+    # 3) Make all NA rows at once (keep id; blank everything else)
+    na_rows <- dat %>%
+        filter(new_row_needed) %>%
+        mutate(.insert_order = 0) %>% # NA goes before original
+        mutate(across(-c(id, row_id, .insert_order), ~NA))
+
+    # 4) Originals with order tag
+    originals <- dat %>%
+        mutate(.insert_order = 1)
+
+    # 5) Bind and order so NA is before flagged original
+    out <- bind_rows(originals, na_rows) %>%
+        arrange(id, row_id, .insert_order) %>%
+        select(-.insert_order)
+
+    out
+}
+
+
+
+
+# =============================================================================
+# This handles a specific cross-condition problem that `add_nas` couldn't catch because `add_nas` is blind to what *type* of beep came before. The scenario it catches is:
+# a mood quesitonnaire being too close to a followup and being counted as followup condition.
+# Function checks: was the previous non-NA row a "followup", and were they less than 20 minutes apart / this is what the precious add_na function would be missing as we defined the interval 1-20
+# =============================================================================
+
+insert_na_for_mood <- function(df, min_minutes = 20) {
     result_df <- df
 
     # Find all mood rows that violate timing
@@ -252,33 +305,224 @@ insert_na_for_mood_timing <- function(df, min_minutes = 45) {
     result_df <- result_df %>%
         mutate(row_id = row_number())
 
-    cat("✓ Done\n")
     return(result_df)
 }
 
-dataset_followups = insert_na_for_mood_timing(
-    dataset_followups,
-    min_minutes = 45
+# ---- Build dataset_followups ----
+# ---- dataset_followups: all beeps, short-interval breaks ----
+dataset_followups = add_nas(
+    dat = data,
+    id = "id",
+    min_diff = 1,
+    max_diff = 20,
+    time_units = "mins",
+    time_var = "time_stop"
 )
 
-dataset_beeps =
-    add_nas(
-        dat = data %>% filter(condition == "mood"), ## filter out followups here
-        id = "id",
-        min_diff = 45,
-        max_diff = 175,
-        time_units = "mins",
-        time_var = "time_start"
+dataset_followups = insert_na_for_mood(
+    dataset_followups,
+    min_minutes = 20
+)
+
+dataset_followups <- dataset_followups %>%
+    rename(time_stop = time) %>%
+    group_by(id) %>%
+    mutate(
+        time_interval = as.numeric(difftime(time_stop, lag(time_stop), units = "mins")),
+        n_valid_pairs = sum(!is.na(time_interval))
+    ) %>%
+    ungroup() %>%
+    select(-row_id, -label_jhxa_followUp)
+
+
+
+# ---- Build dataset_beeps ----
+# ---- dataset_beeps: mood only, long-interval breaks ----
+
+dataset_beeps <- add_nas(
+    dat        = data %>% filter(condition == "mood"),
+    id         = "id",
+    min_diff   = 45,
+    max_diff   = 175,
+    time_units = "mins",
+    time_var   = "time_stop"
+)
+
+dataset_beeps <- dataset_beeps %>%
+    rename(time_stop = time) %>%
+    group_by(id) %>%
+    mutate(
+        time_interval = as.numeric(difftime(time_stop, lag(time_stop), units = "mins")),
+        n_valid_pairs = sum(!is.na(time_interval))
+    ) %>%
+    ungroup() %>%
+    select(-row_id, -label_jhxa_followUp)
+
+# =============================================================================
+# COMBINE, SUMMARISE, FILTER
+# =============================================================================
+data_combined <- bind_rows(
+    dataset_beeps     %>% mutate(dataset = "long_interval"),
+    dataset_followups %>% mutate(dataset = "short_interval")
+)
+
+# ---- Summary statistics and plots ----
+# ---- Plot before filtering ----
+p <- data_combined %>%
+    filter(!is.na(time_interval)) %>%
+  ggplot(aes(x = time_interval, fill = dataset)) +
+  geom_histogram(
+    position = "identity",
+    alpha    = 0.5,
+    bins     = 60,
+    color    = "white"
+  ) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    title = "Distribution of Time Intervals Between Prompts Dejonckheere",
+    x     = "Time interval (minutes)",
+    y     = "Count",
+    fill  = "Dataset"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top"
+  )
+
+ggsave(
+  filename   = file.path("figures", "time_intervals_combined.png"),
+  create.dir = TRUE,
+  plot       = p,
+  width      = 12,
+  height     = 6,
+  dpi        = 300
+)
+
+# ---- Summary statistics before filtering ----
+summary_intervals <- data_combined %>%
+    summarise(
+        min_interval  = min(time_interval,  na.rm = TRUE),
+        mean_interval = mean(time_interval, na.rm = TRUE),
+        sd_interval   = sd(time_interval,   na.rm = TRUE),
+        max_interval  = max(time_interval,  na.rm = TRUE),
+        .by = c(dataset)
     )
 
+summary_pairs <- data_combined %>%
+    select(id, dataset, n_valid_pairs) %>%
+    distinct() %>%
+    summarise(
+        min_pairs  = min(n_valid_pairs),
+        mean_pairs = mean(n_valid_pairs),
+        sd_pairs   = sd(n_valid_pairs),
+        max_pairs  = max(n_valid_pairs),
+        .by = c(dataset)
+    )
+
+n_participants <- data_combined %>%
+    summarise(
+        n_participants = n_distinct(id),
+        .by = c(dataset)
+    )
+
+print(summary_intervals)
+print(summary_pairs)
+print(n_participants)
+
+# ---- Filter: keep only participants with >= 20 valid pairs in every condition ----
+# remove people with less than 20 pairs in either condition
+
+data_combined_valid = data_combined %>%
+    group_by(id) %>%
+    filter(all(n_valid_pairs >= 20)) %>%
+    ungroup()
+
+# Summary statistics
+summary_intervals_valid <- data_combined_valid %>%
+    summarise(
+        min_interval  = min(time_interval,  na.rm = TRUE),
+        mean_interval = mean(time_interval, na.rm = TRUE),
+        sd_interval   = sd(time_interval,   na.rm = TRUE),
+        max_interval  = max(time_interval,  na.rm = TRUE),
+        .by = c(dataset)
+    )
+
+summary_pairs_valid <- data_combined_valid %>%
+    select(id, dataset, n_valid_pairs) %>%
+    distinct() %>%
+    summarise(
+        min_pairs  = min(n_valid_pairs),
+        mean_pairs = mean(n_valid_pairs),
+        sd_pairs   = sd(n_valid_pairs),
+        max_pairs  = max(n_valid_pairs),
+        .by = c(dataset)
+    )
+
+n_participants_valid <- data_combined_valid %>%
+    summarise(
+        n_participants = n_distinct(id),
+        .by = c(dataset)
+    )
+
+print(summary_intervals_valid)
+print(summary_pairs_valid)
+print(n_participants_valid)
+
+p <- data_combined_valid %>%
+    filter(!is.na(time_interval)) %>%
+  ggplot(aes(x = time_interval, fill = dataset)) +
+  geom_histogram(
+    position = "identity",
+    alpha    = 0.5,
+    bins     = 60,
+    color    = "white"
+  ) +
+  scale_fill_brewer(palette = "Set1") +
+  labs(
+    title = "Distribution of Time Intervals Between Prompts Dejonckheere",
+    x     = "Time interval (minutes)",
+    y     = "Count",
+    fill  = "Dataset"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    plot.title    = element_text(face = "bold", hjust = 0.5),
+    legend.position = "top"
+  )
+
+ggsave(
+  filename   = file.path("figures", "time_intervals_valid participants.png"),
+  create.dir = TRUE,
+  plot       = p,
+  width      = 12,
+  height     = 6,
+  dpi        = 300
+)
+
+
+# =============================================================================
+# SAVE
+# =============================================================================
+
+dataset_dejonckheere_short_interval = 
+    data_combined_valid %>%
+    filter(dataset == "short_interval") 
+
+
 write.csv(
-    dataset_followups,
-    file = file.path("data_processed", "dataset_dejonckheere_short_interval"),
+    dataset_dejonckheere_short_interval,
+    file = file.path("data_processed", "dataset_dejonckheere_short_interval.csv"),
     row.names = FALSE
 )
 
+dataset_dejonckheere_long_interval = 
+    data_combined_valid %>%
+    filter(dataset == "long_interval")
+
 write.csv(
-    dataset_beeps,
-    file = file.path("data_processed", "dataset_dejonckheere_long_interval"),
+    dataset_dejonckheere_long_interval,
+    file = file.path("data_processed", "dataset_dejonckheere_long_interval.csv"),
     row.names = FALSE
 )
+
