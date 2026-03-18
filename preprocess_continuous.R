@@ -238,7 +238,7 @@ summary_nolim <- summarize_and_save(data_nolim, "no_limits")
 ## fixed limits ###
 data_fixlim <- data_valid %>%
   group_by(id, condition) %>%
-  filter((condition == "beep" & time_interval >= 80 & time_interval <= 200) | (condition == "burst" & time_interval >= 0 & time_interval <= 40)) %>%
+  filter((condition == "beep" & time_interval >= 100 & time_interval <= 200) | (condition == "burst" & time_interval >= 0 & time_interval <= 40)) %>%
   mutate(n_valid_pairs = n()) |>
   group_by(id) %>%
   filter(all(n_valid_pairs >= min_pairs)) %>%
