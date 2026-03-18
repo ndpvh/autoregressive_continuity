@@ -1,5 +1,7 @@
 readme_data_dejonckheere
 
+
+**Datasets:** `dataset_dejonckheere_short_interval` & `dataset_dejonckheere_long_interval.` 
 Data has two conditions a normal fixed beep and a followup beep that should come 20 minutes later. 
 Some problems in the dataset the missed beeps dont have a timestamp so they show up at the bottom row of each participant. 
 We couldnt recover or get the timestamps anywhere.
@@ -22,12 +24,28 @@ Specifically: a mood beep that arrives less than 20 minutes after a followup bee
 
 The 20-minute threshold matches max_diff = 20 used in add_nas() for consistency.
 
-Notes: 
+observations are further filtered that only participants that have at least 20 effective pairs per condition are included in the data
+
+**Key variables**
+
+- `id`: participant identifier
+- `date`: response date
+- `day.no`: day of ESM
+- `beep.no`: beep across conditions per day (so not all beep numbers are counted in beginning before making datasets so there are not all beep no's in each dataset)
+- `time_start`: start opening questionnarie
+- `time_stop`: sent questionnaire
+- `time_interval_original`: interval before inserting NAs
+- `time_interval`: time between effective pairs
+- `n_valid_paris`: participants pairs
+- `items`: items
+- `new_row_needed`: if row was inserted by add_na
+
+**Notes**
 
 Participant were supposed to get 7 days but most have more... 
 
-Summary 
-
+**Summary**
+***Before Exclusion***
 print(summary_intervals)
   dataset        min_interval mean_interval sd_interval max_interval
 1 long_interval         45.1          112.        34.6          175.
@@ -44,7 +62,7 @@ print(n_participants)
 2 short_interval             96
 
 
-After exclusion 
+***After exclusion*** 
 
  dataset        min_interval mean_interval sd_interval max_interval
 1 long_interval         45.1          113.        34.7          174.

@@ -325,11 +325,11 @@ dataset_followups = insert_na_for_mood(
 )
 
 dataset_followups <- dataset_followups %>%
-    rename(time_stop = time) %>%
+    rename(time_stop = time, time_interval_original = time_interval) %>%
     group_by(id) %>%
     mutate(
         time_interval = as.numeric(difftime(time_stop, lag(time_stop), units = "mins")),
-        n_valid_pairs = sum(!is.na(time_interval))
+        n_valid_pairs = sum(!is.na(time_interval)), .after = time_interval_original
     ) %>%
     ungroup() %>%
     select(-row_id, -label_jhxa_followUp)
@@ -349,11 +349,11 @@ dataset_beeps <- add_nas(
 )
 
 dataset_beeps <- dataset_beeps %>%
-    rename(time_stop = time) %>%
+    rename(time_stop = time, time_interval_original = time_interval) %>%
     group_by(id) %>%
     mutate(
         time_interval = as.numeric(difftime(time_stop, lag(time_stop), units = "mins")),
-        n_valid_pairs = sum(!is.na(time_interval))
+        n_valid_pairs = sum(!is.na(time_interval)), .after = time_interval_original
     ) %>%
     ungroup() %>%
     select(-row_id, -label_jhxa_followUp)
@@ -507,7 +507,8 @@ ggsave(
 
 dataset_dejonckheere_short_interval = 
     data_combined_valid %>%
-    filter(dataset == "short_interval") 
+    filter(dataset == "short_interval") %>%
+    select(id:beep.no, condition:anxious, new_row_needed, dataset)
 
 
 write.csv(
@@ -518,7 +519,9 @@ write.csv(
 
 dataset_dejonckheere_long_interval = 
     data_combined_valid %>%
-    filter(dataset == "long_interval")
+    filter(dataset == "long_interval")%>%
+    select(id:beep.no, condition:anxious, new_row_needed, dataset)
+
 
 write.csv(
     dataset_dejonckheere_long_interval,
