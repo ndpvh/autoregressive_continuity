@@ -508,24 +508,24 @@ ggsave(
 dataset_dejonckheere_short_interval = 
     data_combined_valid %>%
     filter(dataset == "short_interval") %>%
-    select(id:beep.no, condition:anxious, new_row_needed, dataset)
+    select(id:beep.no, condition:anxious, new_row_needed, delta, dataset)
 
 
 write.csv(
     dataset_dejonckheere_short_interval,
-    file = file.path("data_processed", "dataset_dejonckheere_short_interval.csv"),
+    file = file.path("data_processed", "dataset_dejonckheere_short_interval.txt"),
     row.names = FALSE
 )
 
 dataset_dejonckheere_long_interval = 
     data_combined_valid %>%
     filter(dataset == "long_interval")%>%
-    select(id:beep.no, condition:anxious, new_row_needed, dataset)
+    select(id:beep.no, condition:anxious, new_row_needed, delta, dataset)
 
 
 write.csv(
     dataset_dejonckheere_long_interval,
-    file = file.path("data_processed", "dataset_dejonckheere_long_interval.csv"),
+    file = file.path("data_processed", "dataset_dejonckheere_long_interval.txt"),
     row.names = FALSE
 )
 

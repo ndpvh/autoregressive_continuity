@@ -1,8 +1,8 @@
 library(tidyverse) # data wrangling
 library(patchwork) # graphing
-library(ggpubr)# graphing
+library(ggpubr) # graphing
 
-#### Load in Data #### 
+#### Load in Data ####
 
 pace_esm = read.csv(
   file.path(
@@ -15,14 +15,14 @@ cloos_long = read.csv(
   file.path(
     "data_processed",
     "dataset_cloos_beeps_long.txt"
-  ), 
+  ),
   header = TRUE
 )
 cloos_short = read.csv(
   file.path(
     "data_processed",
     "dataset_cloos_burst_short.txt"
-  ), 
+  ),
   header = TRUE
 )
 
@@ -30,14 +30,14 @@ dejonckheere_longinterval = read.csv(
   file.path(
     "data_processed",
     "dataset_dejonckheere_long_interval.txt"
-  ), 
+  ),
   header = TRUE
 )
 dejonckheere_shortinterval = read.csv(
   file.path(
     "data_processed",
     "dataset_dejonckheere_short_interval.txt"
-  ), 
+  ),
   header = TRUE
 )
 
@@ -49,17 +49,28 @@ cloos_combined = rbind(cloos_short, cloos_long)
 # NAs have already been added for the night lags and missing data
 
 cloos_combined = cloos_combined %>%
-  dplyr::select(condition, id, beep.no, burst.no, beep_pa, burst_pa,
-                beep_na, burst_na, time_interval) %>%
+  dplyr::select(
+    condition,
+    id,
+    beep.no,
+    burst.no,
+    beep_pa,
+    burst_pa,
+    beep_na,
+    burst_na,
+    time_interval
+  ) %>%
   rowwise() %>%
-  mutate(response.no = coalesce(beep.no, burst.no),
-         pa = coalesce(beep_pa, burst_pa),
-         na = coalesce(beep_na, burst_na)) %>%
+  mutate(
+    response.no = coalesce(beep.no, burst.no),
+    pa = coalesce(beep_pa, burst_pa),
+    na = coalesce(beep_na, burst_na)
+  ) %>%
   ungroup() %>%
-  dplyr::select(condition, id, response.no, pa, na, time_interval) %>% 
-  dplyr::mutate(condition = ifelse(condition == "burst", 
-                                   "shortinterval", 
-                                   "longinterval"))
+  dplyr::select(condition, id, response.no, pa, na, time_interval) %>%
+  dplyr::mutate(
+    condition = ifelse(condition == "burst", "shortinterval", "longinterval")
+  )
 
 ### Subset Egon's data for run_ar1_function
 
@@ -72,10 +83,14 @@ dejonckheere_longinterval = dejonckheere_longinterval %>%
 dejonckheere_shortinterval = dejonckheere_shortinterval %>%
   dplyr::select(id, relaxed:anxious, intervalcondition, delta)
 
-dejonckheere_fulldata = rbind(dejonckheere_longinterval,
-                              dejonckheere_shortinterval) |>
-  dplyr::rename(time_interval = delta,
-                condition = intervalcondition)
+dejonckheere_fulldata = rbind(
+  dejonckheere_longinterval,
+  dejonckheere_shortinterval
+) |>
+  dplyr::rename(
+    time_interval = delta, # you dont need to use deltat Leonie computed the time_interval and named the column accordingly!
+    condition = intervalcondition
+  )
 
 #### Run Autoregressive Models ####
 
@@ -84,71 +99,98 @@ dejonckheere_fulldata = rbind(dejonckheere_longinterval,
 # The itemcol will be a column that contains all the items being measured
 # The scores for those items at each timepoint needs to be in a column called response
 
-run_ar1_model = function(dataset, idcol, itemcol){
-  
+run_ar1_model = function(dataset, idcol, itemcol) {
   dataset_lagged = dataset %>%
     dplyr::select(condition, response, time_interval) %>%
     fill(condition, .direction = "updown") %>%
     mutate("response_lagged" = dplyr::lag(response))
 
-  idx <- !is.na(dataset_lagged$response) & !is.na(dataset_lagged$response_lagged)
+  idx <- !is.na(dataset_lagged$response) &
+    !is.na(dataset_lagged$response_lagged)
   number_usable = sum(idx)
   time_interval <- mean(dataset_lagged$time_interval[idx], na.rm = TRUE) # Note that na.rm is only necessary for Leonie's data: Not sure what's happening there
-  
-  ar1_model_lm = try(lm(as.formula("response ~ response_lagged"), data = dataset_lagged))
-  
-  ar1_model_arima = try(arima(dataset[ , "response"],
-                              order = c(1, 0, 0)))
-  
+
+  ar1_model_lm = try(lm(
+    as.formula("response ~ response_lagged"),
+    data = dataset_lagged
+  ))
+
+  ar1_model_arima = try(arima(dataset[, "response"], order = c(1, 0, 0)))
+
   # if either model fails OR AR parameter is greater than 1 in abs value, set
   # AR parameter to NA
-  
-  if(class(ar1_model_lm) != "try-error"){
-    
+
+  if (class(ar1_model_lm) != "try-error") {
     ar1_lm_parameter = coef(ar1_model_lm)[2]
-    
-    if(is.na(ar1_lm_parameter) | abs(ar1_lm_parameter) >= 1){
+
+    if (is.na(ar1_lm_parameter) | abs(ar1_lm_parameter) >= 1) {
       ar1_lm_parameter = NA
     }
-  }else{
-      ar1_lm_parameter = NA
-    }
-  
-  if(class(ar1_model_arima) != "try-error"){
-    
+  } else {
+    ar1_lm_parameter = NA
+  }
+
+  if (class(ar1_model_arima) != "try-error") {
     ar1_arima_parameter = coef(ar1_model_arima)[1]
-    
-    if(is.na(ar1_arima_parameter) | abs(ar1_arima_parameter) >= 1){
+
+    if (is.na(ar1_arima_parameter) | abs(ar1_arima_parameter) >= 1) {
       ar1_arima_parameter = NA
     }
-  }else{
+  } else {
     ar1_arima_parameter = NA
   }
-  
-  results_df = data.frame("ID" = unique(dataset[ , idcol]), 
-                          "item" = unique(dataset[ , itemcol]), 
-                          "condition" = unique(dataset_lagged[ , "condition"]),
-                          "ar_lm" = ar1_lm_parameter, "ar_arima" = ar1_arima_parameter,
-                          "number_usable_pairs" = number_usable,
-                          "time_interval" = time_interval)
-  
+
+  results_df = data.frame(
+    "ID" = unique(dataset[, idcol]),
+    "item" = unique(dataset[, itemcol]),
+    "condition" = unique(dataset_lagged[, "condition"]),
+    "ar_lm" = ar1_lm_parameter,
+    "ar_arima" = ar1_arima_parameter,
+    "number_usable_pairs" = number_usable,
+    "time_interval" = time_interval
+  )
+
   return(results_df)
-  
 }
 
 ### Run on PACE Dataset ####
 
 pace_esm_analysis = pace_esm %>%
-  dplyr::select(session, condition, n_day, n_survey_per_day, delta,
-         soci, asse, acti, trus, kind,
-         poli, crea, curi, arti, lazy, orga, reli, irri,
-         rela, care, hung, tire, happ, stres) %>%
-  dplyr::rename(time_interval = delta) %>% 
-  dplyr::mutate(condition = ifelse(condition == "A", 
-                                   "shortinterval", 
-                                   "longinterval")) %>% 
-  pivot_longer(cols = names(.)[-c(1:5)], names_to = "item",
-               values_to = "response")
+  dplyr::select(
+    session,
+    condition,
+    n_day,
+    n_survey_per_day,
+    delta,
+    soci,
+    asse,
+    acti,
+    trus,
+    kind,
+    poli,
+    crea,
+    curi,
+    arti,
+    lazy,
+    orga,
+    reli,
+    irri,
+    rela,
+    care,
+    hung,
+    tire,
+    happ,
+    stres
+  ) %>%
+  dplyr::rename(time_interval = delta) %>%
+  dplyr::mutate(
+    condition = ifelse(condition == "A", "shortinterval", "longinterval")
+  ) %>%
+  pivot_longer(
+    cols = names(.)[-c(1:5)],
+    names_to = "item",
+    values_to = "response"
+  )
 
 pace_ar_datasets = pace_esm_analysis %>%
   group_by(session, item) %>%
@@ -157,10 +199,10 @@ pace_ar_datasets = pace_esm_analysis %>%
 pace_arresults_full = pace_esm_analysis %>%
   group_by(session, item) %>%
   group_split(.keep = TRUE) %>%
-  map_dfr( ~ run_ar1_model(., idcol = "session", itemcol = "item"))
+  map_dfr(~ run_ar1_model(., idcol = "session", itemcol = "item"))
 
 save(
-  pace_arresults_full, 
+  pace_arresults_full,
   file = file.path(
     "results",
     "ar_estimates",
@@ -171,16 +213,15 @@ save(
 #### Run on Leonie's Dataset ####
 
 cloos_combined = cloos_combined %>%
-  pivot_longer(cols = c("pa", "na"),
-               names_to = "item", values_to = "response")
+  pivot_longer(cols = c("pa", "na"), names_to = "item", values_to = "response")
 
 cloos_arresults_full = cloos_combined %>%
   group_by(id, condition, item) %>%
   group_split(.keep = TRUE) %>%
-  map_dfr( ~ run_ar1_model(., idcol = "id", itemcol = "item"))
+  map_dfr(~ run_ar1_model(., idcol = "id", itemcol = "item"))
 
 save(
-  cloos_arresults_full, 
+  cloos_arresults_full,
   file = file.path(
     "results",
     "ar_estimates",
@@ -191,16 +232,19 @@ save(
 #### Run on Egon's Dataset ####
 
 dejonckheere_fulldata = dejonckheere_fulldata %>%
-  pivot_longer(cols = relaxed:anxious, names_to = "item", 
-               values_to = "response")
+  pivot_longer(
+    cols = relaxed:anxious,
+    names_to = "item",
+    values_to = "response"
+  )
 
 dejonckheere_arresults_full = dejonckheere_fulldata %>%
   group_by(id, condition, item) %>%
   group_split(.keep = TRUE) %>%
-  map_dfr( ~ run_ar1_model(., idcol = "id", itemcol = "item"))
+  map_dfr(~ run_ar1_model(., idcol = "id", itemcol = "item"))
 
 save(
-  dejonckheere_arresults_full, 
+  dejonckheere_arresults_full,
   file = file.path(
     "results",
     "ar_estimates",
