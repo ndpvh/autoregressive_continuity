@@ -10,7 +10,9 @@
 
 by <- 0.05
 
-par(mfrow = c(2, 1))
+png(file.path("figures", "real-complex.png"), width = 1000, height = 550)
+
+par(mfrow = c(1, 2))
 plot(
     seq(by, 10, by = by), 
     exp(complex(real = log(0.5), imaginary = 0) * seq(by, 10, by = by)),
@@ -39,6 +41,7 @@ plot(
 ) |>
     suppressWarnings()
 
+dev.off()
 
 
 ################################################################################
@@ -109,11 +112,6 @@ transformer <- function(ar_0,
         )
     }
 
-    theta <- complex(
-        real = log(abs(ar_0)),
-        imaginary = pi
-    )
-
     # Transform to the expected value at a time interval dt_1. Only use the 
     # real parts of this number
     return(Re(exp(theta * dt_1 / dt_0)))
@@ -149,84 +147,7 @@ drift <- function(theta,
 # Run the simulation study itself
 set.seed(6622537) # Sesame Street is No Place for Romance - A Lot Like Birds
 result <- lapply(
-    1:1000, 
-    function(i) {
-        # Generate random values for the drift parameter within particular bounds
-        theta <- complex(
-            real = runif(1, 0.5, 2),
-            imaginary = runif(1, -pi + 1e-2, pi - 1e-2)
-        )
-
-        # Generate the expected autoregressive effects at particular time 
-        # intervals for this drift parameter
-        autoregressive <- drift(theta)
-
-        # Select two random rows within this data.frame. The first occurring 
-        # value will be treated as the given autoregressive effect ar_0 at a 
-        # particular time interval dt_0, while the second value will be taken 
-        # as the time interval dt_1 that we want to transform to
-        idx <- sample(1:nrow(autoregressive), 2) |>
-            sort()
-
-        # Transform the ar_0 to ar_1
-        transformed <- transformer(
-            ar_0 = autoregressive$ar[idx[1]],
-            dt_0 = autoregressive$time_interval[idx[1]],
-            dt_1 = autoregressive$time_interval[idx[2]]
-        )
-
-        # Return a single rowed data.frame containing all useful information
-        return(
-            data.frame(
-                ar_0 = autoregressive$ar[idx[1]],
-                dt_0 = autoregressive$time_interval[idx[1]],
-                dt_1 = autoregressive$time_interval[idx[2]],
-                ar_1_true = autoregressive$ar[idx[2]],
-                ar_1_transformed = transformed,
-                ar_1_difference = abs(transformed - autoregressive$ar[idx[2]]),
-                theta_real = Re(theta),
-                theta_imaginary = Im(theta),
-                oscillating = abs(Im(theta)) > 5e-1
-            )
-        )
-    }
-)
-result <- do.call("rbind", result)
-
-# Plot the result
-par(mfrow = c(1, 1))
-plot(
-    result$ar_1_true, 
-    result$ar_1_transformed, 
-    type = "n",
-    main = "Simulation Study Results",
-    xlab = "True AR",
-    ylab = "Derived AR",
-    xlim = c(-1, 1),
-    ylim = c(-1, 1),
-    cex.main = 3,
-    cex.lab = 2
-)
-abline(
-    a = 0, 
-    b = 1, 
-    col = "black",
-    lwd = 3
-)
-points(
-    result$ar_1_true,
-    result$ar_1_transformed, 
-    col = "black",
-    bg = "cornflowerblue",
-    cex = 3,
-    pch = 21
-)
-
-# Doing the same simulation, but rounding the difference in time intervals to 
-# the nearest integer instead, what happens then?
-set.seed(6622539) # Sesame Street is No Place for Vengeance - A Lot Like Birds
-result <- lapply(
-    1:1000, 
+    1:500, 
     function(i) {
         # Generate random values for the drift parameter within particular bounds
         theta <- complex(
@@ -249,22 +170,23 @@ result <- lapply(
         times <- autoregressive$time_interval[idx]
         transformed <- transformer(
             ar_0 = autoregressive$ar[idx[1]],
-            dt_0 = 1,
-            dt_1 = round(times[2] / times[1])
+            dt_0 = times[1],
+            dt_1 = times[2]
         )
 
         # Return a single rowed data.frame containing all useful information
         return(
             data.frame(
                 ar_0 = autoregressive$ar[idx[1]],
-                dt_0 = autoregressive$time_interval[idx[1]],
-                dt_1 = autoregressive$time_interval[idx[2]],
+                dt_0 = times[1],
+                dt_1 = times[2],
                 ar_1_true = autoregressive$ar[idx[2]],
                 ar_1_transformed = transformed,
                 ar_1_difference = abs(transformed - autoregressive$ar[idx[2]]),
                 theta_real = Re(theta),
                 theta_imaginary = Im(theta),
-                oscillating = abs(Im(theta)) > 5e-1
+                oscillating = abs(Im(theta)) > 5e-1,
+                dt_difference = abs(times[2] / times[1] - round(times[2] / times[1]))
             )
         )
     }
@@ -272,6 +194,7 @@ result <- lapply(
 result <- do.call("rbind", result)
 
 # Plot the result
+png(file.path("figures", "simulation.png"), width = 750, height = 850)
 par(mfrow = c(1, 1))
 plot(
     result$ar_1_true, 
@@ -299,7 +222,4 @@ points(
     cex = 3,
     pch = 21
 )
-
-
-
-
+dev.off()
