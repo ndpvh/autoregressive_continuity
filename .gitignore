@@ -4,3 +4,4 @@ data/
 figure.R
 results/*.txt
 *DS_Store
+*copy*
