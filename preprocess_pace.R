@@ -16,7 +16,7 @@ dat_a <- dat %>%
 
 dat_b <- dat %>% 
   filter(condition == "B") %>% 
-  add_nas(id = "session",min_diff =60, max_diff=130, # 2-4 hours + 10 mins to complete
+  add_nas(id = "session",min_diff =120, max_diff=250, # 2-4 hours + 10 mins to complete
           time_units = "mins", time_var = "ended", alter_time_var = "created")
 
 #merge datasets
