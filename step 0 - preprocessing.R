@@ -41,7 +41,13 @@ data <- readr::read_csv(
     "data", 
     "BUCHNER.csv"
   )
-)
+) |>
+  dplyr::select(
+    session:ended, 
+    condition, 
+    soci:stres
+  ) |>
+  tidyr::drop_na(soci:stres)
 
 # Distinguish between the long and short interval conditions and add NAs to 
 # those values that are deemed to fall outside of the intended intervals 
@@ -55,9 +61,10 @@ data_a <- data |>
     min_diff = 60, 
     max_diff = 130,
     time_units = time_unit, 
-    time_var = "ended", 
+    time_var = "ended",
     alter_time_var = "created"
-  )
+  ) |>
+  dplyr::mutate(condition = "short_interval")
 
 data_b <- data |> 
   dplyr::filter(condition == "B") |> 
@@ -68,11 +75,11 @@ data_b <- data |>
     time_units = time_unit, 
     time_var = "ended", 
     alter_time_var = "created"
-  )
+  )|>
+  dplyr::mutate(condition = "long_interval")
 
-# Merge the datasets, only keep those variables of interest, rename the 
-# conditions to be more informative (and in line with the other datasets), and
-# convert the participant ids to numbers
+# Merge the datasets, only keep those variables of interest and convert the 
+# participant ids to numbers
 data <- dplyr::bind_rows(data_a, data_b) |>
   dplyr::select(
     id,
@@ -82,11 +89,6 @@ data <- dplyr::bind_rows(data_a, data_b) |>
     soci:stres
   ) |>
   dplyr::mutate(
-    condition = ifelse(
-      condition == "A",
-      "short_interval",
-      "long_interval"
-    ),
     id = id |>
       as.factor() |>
       as.numeric()
@@ -111,7 +113,6 @@ data <- data |>
   dplyr::mutate(
     data = data |>
       as.data.frame() |>
-      dplyr::arrange(time) |>
       dplyr::mutate(
         dplyr::across(
           soci:stres, 
@@ -122,6 +123,17 @@ data <- data |>
       list()
   ) |>
   tidyr::unnest(data)
+
+# Add "beep numbers" to the data.frame to allow disambiguation in the next step.
+# Note that these are not the actual beep numbers: Instead, they represent the 
+# number for the ordered observations and imputed NAs in the dataset
+data <- data |>
+  dplyr::group_by(id, condition) |>
+  dplyr::mutate(
+    beep_number = dplyr::row_number(),
+    .after = id
+  ) |>
+  dplyr::ungroup()
 
 # Put in long format with the response and the lagged response next to each 
 # other.
@@ -152,7 +164,7 @@ data <- data |>
   ) |>
   dplyr::full_join(
     lagged, 
-    by = c("id", "time", "time_interval", "condition", "item")
+    by = c("id", "beep_number", "time", "time_interval", "condition", "item")
   )
 
 # Save the processed data in the corresponding folder
@@ -326,7 +338,7 @@ followup <- data |>
     .after = time_interval_original
   ) |>
   dplyr::ungroup() |>
-  dplyr::mutate(dataset = "shortinterval") |>
+  dplyr::mutate(dataset = "short_interval") |>
   dplyr::select(-row_id, -new_row_needed)
 
 # Build the full dataset, using only the original beeps, preprocessing them, 
@@ -352,7 +364,7 @@ data <- data |>
     .after = time_interval_original
   ) |>
   dplyr::ungroup() |> 
-  dplyr::mutate(dataset = "longinterval") |>
+  dplyr::mutate(dataset = "long_interval") |>
   dplyr::select(-row_id, -new_row_needed) |>
   dplyr::bind_rows(followup)
 
@@ -376,7 +388,6 @@ data <- data |>
   dplyr::mutate(
     data = data |>
       as.data.frame() |>
-      dplyr::arrange(time) |>
       dplyr::mutate(
         dplyr::across(
           relaxed:anxious, 
@@ -511,7 +522,6 @@ data <- data |>
   dplyr::mutate(
     data = data |>
       as.data.frame() |>
-      dplyr::arrange(time) |>
       dplyr::mutate(
         dplyr::across(
           na:pa, 
