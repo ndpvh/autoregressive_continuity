@@ -9,7 +9,7 @@ run_ar1_model <- function(data,
                           item = "item") {
 
   # Check how many responses are used for the estimation
-  idx <- !is.na(data$response) & !is.na(data$response_lagged)
+  idx <- !is.na(data$response) & !is.na(data$response_lag)
   number_usable <- sum(idx)
 
   # Compute the average time interval for these data. Used to derive the 
@@ -21,7 +21,7 @@ run_ar1_model <- function(data,
 
   # Compute the AR(1) using least-squares estimation
   ar1_model_lm = lm(
-    response ~ response_lagged,
+    response ~ response_lag,
     data = data
   ) |>
     try()
@@ -62,8 +62,8 @@ run_ar1_model <- function(data,
 
   # Create a data.frame containing the results and return
   results_df = data.frame(
-    "id" = unique(data[, idcol]),
-    "item" = unique(data[, itemcol]),
+    "id" = unique(data[, id]),
+    "item" = unique(data[, item]),
     "condition" = unique(data$condition),
     "ar_lm" = ar1_lm_parameter,
     "ar_arima" = ar1_arima_parameter,
