@@ -26,10 +26,13 @@ run_ar1_model <- function(data,
   ) |>
     try()
 
-  # Compute the AR(1) using the ARIMA function. Is less error-prone
+  # Compute the AR(1) using the ARIMA function. Note that we defined the lagged
+  # response as an external variable. This is done to ensure that the same 
+  # mapping is used in the least-squares estimation and the ARIMA one, 
+  # furthermore being more robust for the within-person estimation
   ar1_model_arima = arima(
     data$response, 
-    order = c(1, 0, 0)
+    xreg = data$response_lag
   ) |>
     try()
 
@@ -42,7 +45,7 @@ run_ar1_model <- function(data,
   )
   ar1_arima_parameter <- dplyr::if_else(
     class(ar1_model_arima) != "try-error",
-    coef(ar1_model_arima)[1],
+    coef(ar1_model_arima)[2],
     NA
   )
 
