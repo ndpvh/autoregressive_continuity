@@ -156,9 +156,9 @@ data <- data |>
   )
 
 # Save the processed data in the corresponding folder
-readr::write_csv(
+saveRDS(
   data, 
-  here("data_processed", "BUCHNER.csv")
+  here("data_processed", "BUCHNER.Rds")
 )
 
 
@@ -425,9 +425,9 @@ data <- data |>
   dplyr::rename(condition = dataset)
 
 # Save the processed data in the corresponding folder
-readr::write_csv(
+saveRDS(
   data, 
-  here("data_processed", "DEJONCKHEERE.csv")
+  here("data_processed", "DEJONCKHEERE.Rds")
 )
 
 
@@ -598,8 +598,8 @@ data <- data |>
 
 
 # Save the processed data in the corresponding folder
-readr::write_csv(
+saveRDS(
   data, 
-  here("data_processed", "CLOOS.csv")
+  here("data_processed", "CLOOS.Rds")
 )
 
