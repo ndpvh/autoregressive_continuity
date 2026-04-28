@@ -213,7 +213,8 @@ data <- data |>
   dplyr::select(
     id:time_stop, 
     relaxed:anxious
-  )
+  ) |>
+  tidyr::drop_na(relaxed:anxious)
 
 # M-path questionnaire names need to be changed. Followup in m-path means that 
 # within that questionnaire, there is a follow up item, so that within this 
@@ -258,63 +259,6 @@ data <- data |>
     )
   )
 
-# Add the date, total beep duration, day number, beep number (within day), and 
-# information on whether a beep was missed
-data <- data |>
-  dplyr::group_by(id) |>
-  dplyr::mutate(
-    date = lubridate::as_date(time_start),
-    onbeep.mins = lubridate::time_length(
-      time_stop - time_start, 
-      time_unit
-    ),
-    .after = "id"
-  ) |>
-  dplyr::filter(!is.na(date)) |> # filter is NA
-  dplyr::group_by(id) |>
-  tidyr::nest() |>
-  dplyr::mutate(
-    data = purrr::map(
-      data, 
-      ~ dplyr::group_by(
-        ., 
-        date
-      )
-    ),
-    data = purrr::map(
-      data, 
-      ~ dplyr::mutate(
-        ., 
-        day.no = dplyr::cur_group_id()
-      )
-    )
-  ) |>
-  tidyr::unnest(data) |>
-  dplyr::ungroup() |>
-  dplyr::relocate(
-    day.no, 
-    .after = date
-  ) |>
-  dplyr::group_by(id, day.no) |>
-  dplyr::mutate(beep.no = seq.int(1, n(), 1)) |>
-  dplyr::arrange(id, time_start) |>
-  dplyr::relocate(beep.no, .after = day.no) |>
-  dplyr::mutate(missed = is.na(time_start)) |>
-  dplyr::ungroup()
-
-# Compute time intervals
-data <- data |>
-  dplyr::group_by(id, day.no) |>
-  dplyr::arrange(time_stop) |>
-  dplyr::mutate(
-    time_interval = lubridate::time_length(
-      time_stop - lag(time_stop), 
-      time_unit
-    ),
-    .after = time_stop
-  ) |>
-  dplyr::ungroup()
-
 # Build the dataset containing only the followups, building on the add_na and 
 # insert_na_for_mood functions
 followup <- data |>
@@ -327,18 +271,15 @@ followup <- data |>
   ) |>
   insert_na_for_mood(min_minutes = 20) |>
   dplyr::rename(
-    time_stop = time, 
-    time_interval_original = time_interval
+    time_interval = delta
   ) |>
   dplyr::group_by(id) |>
   dplyr::mutate(
-    time_interval = difftime(time_stop, lag(time_stop), units = time_unit) |>
-      as.numeric(),
     n_valid_pairs = sum(!is.na(time_interval)), 
-    .after = time_interval_original
+    .after = time_interval
   ) |>
   dplyr::ungroup() |>
-  dplyr::mutate(dataset = "short_interval") |>
+  dplyr::mutate(condition = "short_interval") |>
   dplyr::select(-row_id, -new_row_needed)
 
 # Build the full dataset, using only the original beeps, preprocessing them, 
@@ -353,37 +294,47 @@ data <- data |>
     time_var = "time_stop"
   ) |>
   dplyr::rename(
-    time_stop = time, 
-    time_interval_original = time_interval
+    time_interval = delta
   ) |>
   dplyr::group_by(id) |>
   dplyr::mutate(
-    time_interval = difftime(time_stop, lag(time_stop), units = time_unit) |>
-      as.numeric(),
     n_valid_pairs = sum(!is.na(time_interval)), 
-    .after = time_interval_original
+    .after = time_interval
   ) |>
   dplyr::ungroup() |> 
-  dplyr::mutate(dataset = "long_interval") |>
+  dplyr::mutate(condition = "long_interval") |>
   dplyr::select(-row_id, -new_row_needed) |>
   dplyr::bind_rows(followup)
 
 # Filter out participants who do not have the prespecified number of pairs in 
 # every condition. 
 data <- data |>
-  dplyr::filter(n_valid_pairs >= min_pairs) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(to_keep = all(n_valid_pairs >= min_pairs)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(to_keep) |>
   dplyr::select(
     id, 
-    time_stop,
+    condition, 
+    time,
     time_interval, 
-    relaxed:anxious, 
-    dataset
+    relaxed:anxious
+  )
+
+# Add "beep numbers" to the data.frame to allow disambiguation in the next step.
+# Note that these are not the actual beep numbers: Instead, they represent the 
+# number for the ordered observations and imputed NAs in the dataset
+data <- data |>
+  dplyr::group_by(id, condition) |>
+  dplyr::mutate(
+    beep_number = dplyr::row_number(),
+    .after = id
   ) |>
-  dplyr::rename(time = time_stop)
+  dplyr::ungroup()
 
 # Create lagged data to be used for the estimation.
 data <- data |>
-  dplyr::group_by(id, dataset) |>
+  dplyr::group_by(id, condition) |>
   tidyr::nest() |>
   dplyr::mutate(
     data = data |>
@@ -431,9 +382,8 @@ data <- data |>
   ) |>
   dplyr::full_join(
     lagged, 
-    by = c("id", "time", "time_interval", "dataset", "item")
-  ) |>
-  dplyr::rename(condition = dataset)
+    by = c("id", "beep_number", "time", "time_interval", "condition", "item")
+  )
 
 # Save the processed data in the corresponding folder
 saveRDS(
@@ -452,7 +402,7 @@ data <- readr::read_csv(
     "data", 
     "CLOOS.csv"
   )
-)[, -1]
+)[, -1] 
 
 # Filter out those results that come from the continuous measurement scale used
 # in the study through the "missed" variable, select only the relevant columns,
@@ -469,7 +419,7 @@ data <- data |>
 # taken together in their own respective columns, distinguishing between the two
 # kinds of responses in a condition column. Assign measurement count (within 
 # condition), exclude beeps that are faulty (i.e., answered in the wrong 
-# direction; e.g., frist beep 6 than beep 5), and only keep first timewise beep
+# direction; e.g., first beep 6 than beep 5), and only keep first timewise beep
 # to disambiguate
 data <- data |>
   dplyr::mutate(
@@ -511,7 +461,7 @@ data <- data |>
     na,
     pa
   ) |>
-  dplyr::arrange(id, condition, time)
+  dplyr::arrange(id, time)
 
 # Put lagged values of PA/NA and current PA/NA within same row, compute the time 
 # intervals and filter on them with a fixed range, letting beeps fall within
@@ -563,16 +513,28 @@ data <- data |>
     n_valid_pairs = sum(!missed)
   ) |>
   dplyr::ungroup() |> 
-  dplyr::filter(n_valid_pairs >= min_pairs) |> 
-  dplyr::select(-n_valid_pairs, -missed) 
+  dplyr::group_by(id) |>
+  dplyr::mutate(to_keep = all(n_valid_pairs >= min_pairs)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(to_keep) |>
+  dplyr::select(-n_valid_pairs, -missed, -to_keep, -meas_no) 
+
+# Add "beep numbers" to the data.frame to allow disambiguation in the next step.
+# Note that these are not the actual beep numbers: Instead, they represent the 
+# number for the ordered observations and imputed NAs in the dataset
+data <- data |>
+  dplyr::group_by(id, condition) |>
+  dplyr::mutate(
+    beep_number = dplyr::row_number(),
+    .after = id
+  ) |>
+  dplyr::ungroup()
 
 # Put in long format with the response and the lagged response next to each 
 # other.
 lagged <- data |>
   dplyr::select(
-    id,
-    time, 
-    condition,
+    id:condition,
     na_lag:pa_lag,
     time_interval
   ) |>
@@ -591,8 +553,7 @@ lagged <- data |>
 
 data <- data |>
   dplyr::select(
-    id, 
-    time:meas_no, 
+    id:condition, 
     na:pa, 
     time_interval
   ) |>
@@ -603,9 +564,15 @@ data <- data |>
   ) |>
   dplyr::full_join(
     lagged, 
-    by = c("id", "time", "time_interval", "condition", "item")
+    by = c("id", "beep_number", "time", "time_interval", "condition", "item")
+  ) |>
+  dplyr::mutate(
+    condition = dplyr::if_else(
+      condition == "beep",
+      "long_interval", 
+      "short_interval"
+    )
   )
-
 
 # Save the processed data in the corresponding folder
 saveRDS(
