@@ -503,7 +503,8 @@ data <- data |>
       time_interval >= 120 & time_interval <= 160, 
       time_interval <= 40
     )
-  )
+  ) |>
+  dplyr::select(-date, -connectionId)
 
 # Delete all participants that do not have a sufficient number of valid pairs 
 # that can be made with the data.
