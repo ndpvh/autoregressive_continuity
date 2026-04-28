@@ -42,12 +42,18 @@ data <- list(
 
 # Run the analysis on the different datasets and save them
 for(i in seq_along(data)) {
+  # Give some indication of where we are
+  print(names(data)[i])
+
+  # Perform the estimation
   results <- data[[i]] |>
     dplyr::group_by(id, condition, item) |>
     dplyr::group_split(.keep = TRUE) |>
     purrr::map_dfr(~ run_ar1_model(.))
 
+  # Save the results
   saveRDS(
+    results,
     here::here(
       "results", 
       paste0(
