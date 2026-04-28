@@ -20,41 +20,41 @@ run_ar1_model <- function(data,
   ) 
 
   # Compute the AR(1) using least-squares estimation
-  ar1_model_lm = lm(
+  ar1_model_lm <- lm(
     response ~ response_lag,
     data = data
   ) |>
-    try()
+    try(silent = TRUE)
 
   # Compute the AR(1) using the ARIMA function. Note that we defined the lagged
   # response as an external variable. This is done to ensure that the same 
   # mapping is used in the least-squares estimation and the ARIMA one, 
   # furthermore being more robust for the within-person estimation
-  ar1_model_arima = arima(
+  ar1_model_arima <- arima(
     data$response, 
     xreg = data$response_lag
   ) |>
-    try()
+    try(silent = TRUE)
 
   # Check whether the model failed to converge, and if so, set the autoregressive
   # effect to NA
-  ar1_lm_parameter <- dplyr::if_else(
-    class(ar1_model_lm) != "try-error",
+  ar1_lm_parameter <- ifelse(
+    !inherits(ar1_model_lm, "try-error"),
     coef(ar1_model_lm)[2],
     NA
   )
-  ar1_arima_parameter <- dplyr::if_else(
-    class(ar1_model_arima) != "try-error",
+  ar1_arima_parameter <- ifelse(
+    !inherits(ar1_model_arima, "try-error"),
     coef(ar1_model_arima)[2],
     NA
   )
 
-  ar1_lm_parameter <- dplyr::if_else(
+  ar1_lm_parameter <- ifelse(
     is.na(ar1_lm_parameter) | abs(ar1_lm_parameter) >= 1, 
     NA, 
     ar1_lm_parameter
   )
-  ar1_arima_parameter <- dplyr::if_else(
+  ar1_arima_parameter <- ifelse(
     is.na(ar1_arima_parameter) | abs(ar1_arima_parameter) >= 1, 
     NA, 
     ar1_arima_parameter
