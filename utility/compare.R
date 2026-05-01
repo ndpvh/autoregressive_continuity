@@ -78,6 +78,19 @@ compare <- function(dataset,
       dataset$short_interval,
       mu = ct_l2s
     )
+
+    # Compute effect sizes for these differences
+    d <- effectsize::cohens_d(
+      dataset$long_interval, 
+      dataset$short_interval,
+      paired = TRUE
+    )
+    d_s2l <- effectsize::cohens_d(
+      dataset$long_interval - ct_s2l
+    )
+    d_l2s <- effectsize::cohens_d(
+      dataset$short_interval - ct_l2s
+    )
     
     # Changed, but kept in for posterity (if we need to make this choice again).
     # In this piece of code, we compare each individual's expected value within
@@ -113,6 +126,19 @@ compare <- function(dataset,
       dataset$ar_arima[dataset$condition == "short_interval"],
       mu = ct_l2s
     )
+
+    # Compute effect sizes for these differences
+    d <- effectsize::cohens_d(
+      dataset$ar_arima[dataset$condition == "long_interval"], 
+      dataset$ar_arima[dataset$condition == "short_interval"],
+      paired = FALSE
+    )
+    d_s2l <- effectsize::cohens_d(
+      dataset$ar_arima[dataset$condition == "long_interval"] - ct_s2l
+    )
+    d_l2s <- effectsize::cohens_d(
+      dataset$ar_arima[dataset$condition == "short_interval"] - ct_l2s
+    )
   }
 
   # Create a single-row data.frame with all relevant information
@@ -132,18 +158,27 @@ compare <- function(dataset,
     condition_p = test_1$p.value,
     condition_q025 = test_1$conf.int[1],
     condition_q975 = test_1$conf.int[2],
+    condition_d = d$Cohens_d, 
+    condition_d025 = d$CI_low,
+    condition_d975 = d$CI_high, 
 
     continuous_s2l_t = test_2$statistic,
     continuous_s2l_df = test_2$parameter,
     continuous_s2l_p = test_2$p.value, 
     continuous_s2l_q025 = test_2$conf.int[1],
     continuous_s2l_q975 = test_2$conf.int[2],
+    continuous_s2l_d = d_s2l$Cohens_d, 
+    continuous_s2l_d025 = d_s2l$CI_low,
+    continuous_s2l_d975 = d_s2l$CI_high,
 
     continuous_l2s_t = test_3$statistic,
     continuous_l2s_df = test_3$parameter,
     continuous_l2s_p = test_3$p.value, 
     continuous_l2s_q025 = test_3$conf.int[1],
-    continuous_l2s_q975 = test_3$conf.int[2]
+    continuous_l2s_q975 = test_3$conf.int[2],
+    continuous_l2s_d = d_l2s$Cohens_d, 
+    continuous_l2s_d025 = d_l2s$CI_low,
+    continuous_l2s_d975 = d_l2s$CI_high
   )
 
   return(results)
