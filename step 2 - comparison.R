@@ -53,7 +53,15 @@ for(i in seq_along(data)) {
   # Peform comparison and filter on the number of useable pairs. Save the results
   # in an Rds file
   results <- data[[i]] |>
-    dplyr::filter(number_usable_pairs >= 20) |>
+    # Delete participants who have too few usable pairs across conditions (i.e.,
+    # if at least once too few, delete them anyway)
+    dplyr::group_by(id) |>
+    dplyr::mutate(to_keep = min(number_usable_pairs) >= 20) |>
+    dplyr::ungroup() |>
+    dplyr::filter(to_keep) |>
+    dplyr::select(-to_keep) |>
+
+    # Perform the actual analysis
     dplyr::group_by(item) |>
     dplyr::group_split(.keep = TRUE) |>
     purrr::map_dfr(
