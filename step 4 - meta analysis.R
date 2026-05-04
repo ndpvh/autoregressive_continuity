@@ -43,24 +43,36 @@ type <- c(
   "continuous_l2s"
 )
 
-# Loop over the data and run the meta-analysis
-for(i in seq_along(data)) {
-  # Define the limits for the plot. Based on the 99% confidence interval 
-  # of the estimates, ensuring some space is left (as the 95%CI is plotted)
-  estimate <- data[[i]][, paste(type, "d", sep = "_")] |>
+# Define the limits for the plots. Based on the 99% confidence interval 
+# of the estimates, ensuring some space is left (as the 95%CI is plotted)
+estimate <- lapply(
+  data,
+  function(x) x[, paste(type, "d", sep = "_")] |>
     unlist() |>
     as.numeric() 
-  se <- data[[i]][, paste(type, "dvar", sep = "_")] |>
-    unlist() |>
-    as.numeric() |>
-    sqrt()
-  bounds <- c(
-    estimate - 2.576 * se, 
-    estimate + 2.567 * se
-  )
-  alims <- range(bounds)
-  xlims <- alims + c(-0.5, 0.5) * diff(alims)
+) |>
+  unlist() |>
+  as.numeric()
+se <- lapply(
+  data,
+  function(x) x[, paste(type, "dvar", sep = "_")] |>
+  unlist() |>
+  as.numeric() |>
+  sqrt()
+) |>
+  unlist() |>
+  as.numeric()
+bounds <- c(
+  estimate - 2.576 * se, 
+  estimate + 2.567 * se
+)
+alims <- range(bounds) |>
+  round(2)
+xlims <- alims + c(-0.5, 0.5) * diff(alims)
 
+# Loop over the data and run the meta-analysis
+set.seed(345) # Moneen - The Long Count
+for(i in seq_along(data)) {
   for(j in seq_along(type)) {
     # Create the columnnames specifying the standard deviation and effect size 
     # for this type of comparison
