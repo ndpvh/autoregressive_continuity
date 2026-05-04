@@ -66,8 +66,10 @@ bounds <- c(
   estimate - 2.576 * se, 
   estimate + 2.567 * se
 )
-alims <- range(bounds) |>
-  round(2)
+
+# Derive the limits themselves. Round the alims to 0.5 precision, allowing for 
+# a cleaner number of steps in the plots
+alims <- round(range(bounds) * 2, 0) / 2
 xlims <- alims + c(-0.5, 0.5) * diff(alims)
 
 # Loop over the data and run the meta-analysis
@@ -139,7 +141,9 @@ for(i in seq_along(data)) {
       ),
       width = c(0.1, 0.8, 0.1),
       psize = 1,
-      cex = 1
+      cex = 1,
+      digits = 1,
+      steps = 8
     )
 
     dev.off()
