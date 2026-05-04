@@ -9,7 +9,7 @@ cohen_d <- function(t,
                     paired = FALSE) {
 
   # Some checks first:
-  if(is.na(t) || is.na(n)) {
+  if(is.na(t) || any(is.na(n))) {
     return(
       data.frame(
         d = NA_real_, 
@@ -44,8 +44,8 @@ cohen_d <- function(t,
 
   return(
     data.frame(
-      d = d, 
-      dvar = dvar
+      d = as.numeric(d), 
+      dvar = as.numeric(dvar)
     )
   )
 }
