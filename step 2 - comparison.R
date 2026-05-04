@@ -18,7 +18,13 @@
 library(tidyverse)
 library(here)
 
-# Read in the comparison function
+# Read in the cohen_d and comparison function
+source(
+  here::here(
+    "utility",
+    "cohen_d.R"
+  )
+)
 source(
   here::here(
     "utility",

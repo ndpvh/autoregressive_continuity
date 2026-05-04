@@ -62,7 +62,7 @@ compare <- function(dataset,
         values_from = ar_arima
       )
 
-    # Perform the independent-samples t-test: Differences across conditions
+    # Perform the paired-sample t-test: Differences across conditions
     test_1 <- t.test(
       dataset$long_interval,
       dataset$short_interval, 
@@ -80,16 +80,20 @@ compare <- function(dataset,
     )
 
     # Compute effect sizes for these differences
-    d <- effectsize::cohens_d(
-      dataset$long_interval, 
-      dataset$short_interval,
+    d <- cohen_d(
+      test_1$statistic, 
+      nrow(dataset),
       paired = TRUE
     )
-    d_s2l <- effectsize::cohens_d(
-      dataset$long_interval - ct_s2l
+    d_s2l <- cohen_d(
+      test_2$statistic,
+      nrow(dataset), 
+      paired = FALSE
     )
     d_l2s <- effectsize::cohens_d(
-      dataset$short_interval - ct_l2s
+      test_3$statistic,
+      nrow(dataset), 
+      paired = FALSE
     )
     
     # Changed, but kept in for posterity (if we need to make this choice again).
@@ -128,16 +132,23 @@ compare <- function(dataset,
     )
 
     # Compute effect sizes for these differences
-    d <- effectsize::cohens_d(
-      dataset$ar_arima[dataset$condition == "long_interval"], 
-      dataset$ar_arima[dataset$condition == "short_interval"],
+    d <- cohen_d(
+      test_1$statistic, 
+      c(
+        sum(dataset$condition == "long_interval"), 
+        sum(dataset$condition == "short_interval")
+      ),
       paired = FALSE
     )
-    d_s2l <- effectsize::cohens_d(
-      dataset$ar_arima[dataset$condition == "long_interval"] - ct_s2l
+    d_s2l <- cohen_d(
+      test_2$statistic,
+      nrow(dataset), 
+      paired = FALSE
     )
     d_l2s <- effectsize::cohens_d(
-      dataset$ar_arima[dataset$condition == "short_interval"] - ct_l2s
+      test_3$statistic,
+      nrow(dataset), 
+      paired = FALSE
     )
   }
 
@@ -158,30 +169,25 @@ compare <- function(dataset,
     condition_p = test_1$p.value,
     condition_q025 = test_1$conf.int[1],
     condition_q975 = test_1$conf.int[2],
-    condition_d = d$Cohens_d, 
-    condition_d025 = d$CI_low,
-    condition_d975 = d$CI_high, 
+    condition_d = d$d, 
+    condition_dvar = d$dvar 
 
     continuous_s2l_t = test_2$statistic,
     continuous_s2l_df = test_2$parameter,
     continuous_s2l_p = test_2$p.value, 
     continuous_s2l_q025 = test_2$conf.int[1],
     continuous_s2l_q975 = test_2$conf.int[2],
-    continuous_s2l_d = d_s2l$Cohens_d, 
-    continuous_s2l_d025 = d_s2l$CI_low,
-    continuous_s2l_d975 = d_s2l$CI_high,
+    continuous_s2l_d = d_s2l$d, 
+    continuous_s2l_dvar = d_s2l$dvar,
 
     continuous_l2s_t = test_3$statistic,
     continuous_l2s_df = test_3$parameter,
     continuous_l2s_p = test_3$p.value, 
     continuous_l2s_q025 = test_3$conf.int[1],
     continuous_l2s_q975 = test_3$conf.int[2],
-    continuous_l2s_d = d_l2s$Cohens_d, 
-    continuous_l2s_d025 = d_l2s$CI_low,
-    continuous_l2s_d975 = d_l2s$CI_high
+    continuous_l2s_d = d_l2s$d, 
+    continuous_l2s_dvar = d_l2s$dvar
   )
 
   return(results)
-  
-  
 }
