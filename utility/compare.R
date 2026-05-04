@@ -90,7 +90,7 @@ compare <- function(dataset,
       nrow(dataset), 
       paired = FALSE
     )
-    d_l2s <- effectsize::cohens_d(
+    d_l2s <- cohen_d(
       test_3$statistic,
       nrow(dataset), 
       paired = FALSE
@@ -142,12 +142,12 @@ compare <- function(dataset,
     )
     d_s2l <- cohen_d(
       test_2$statistic,
-      nrow(dataset), 
+      sum(dataset$condition == "long_interval"), 
       paired = FALSE
     )
-    d_l2s <- effectsize::cohens_d(
+    d_l2s <- cohen_d(
       test_3$statistic,
-      nrow(dataset), 
+      sum(dataset$condition == "short_interval"), 
       paired = FALSE
     )
   }
@@ -170,7 +170,7 @@ compare <- function(dataset,
     condition_q025 = test_1$conf.int[1],
     condition_q975 = test_1$conf.int[2],
     condition_d = d$d, 
-    condition_dvar = d$dvar 
+    condition_dvar = d$dvar,
 
     continuous_s2l_t = test_2$statistic,
     continuous_s2l_df = test_2$parameter,
