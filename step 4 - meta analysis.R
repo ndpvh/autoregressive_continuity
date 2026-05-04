@@ -45,6 +45,22 @@ type <- c(
 
 # Loop over the data and run the meta-analysis
 for(i in seq_along(data)) {
+  # Define the limits for the plot. Based on the 99% confidence interval 
+  # of the estimates, ensuring some space is left (as the 95%CI is plotted)
+  estimate <- data[[i]][, paste(type, "d", sep = "_")] |>
+    unlist() |>
+    as.numeric() 
+  se <- data[[i]][, paste(type, "dvar", sep = "_")] |>
+    unlist() |>
+    as.numeric() |>
+    sqrt()
+  bounds <- c(
+    estimate - 2.576 * se, 
+    estimate + 2.567 * se
+  )
+  alims <- range(bounds)
+  xlims <- alims + c(-0.5, 0.5) * diff(alims)
+
   for(j in seq_along(type)) {
     # Create the columnnames specifying the standard deviation and effect size 
     # for this type of comparison
@@ -92,12 +108,26 @@ for(i in seq_along(data)) {
         )
       ),
       width = 8, 
-      height = 6
+      height = 5 * nrow(data_ij) / 19 + 1.5
     )
+
+    par(mar = rep(2, 4))
 
     metafor::forest(
       result, 
-      slab = data_ij$item
+      xlab = "Cohen's d",
+      slab = data_ij$item, 
+      header = "Item",
+      alim = alims,
+      xlim = xlims,
+      refline = ifelse(
+        0 > lims[1] & 0 < lims[2],
+        0,
+        NA
+      ),
+      width = c(0.1, 0.8, 0.1),
+      psize = 1,
+      cex = 1
     )
 
     dev.off()
