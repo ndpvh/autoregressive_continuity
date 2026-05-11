@@ -25,10 +25,11 @@ data <- list(
 )
 
 # Define the number of bootstraps to draw
-N <- 1000
+N <- 10000
 
 # Loop over this list, the items, and the conditions and create summary 
 # statistics of interest
+set.seed(154) # A Great Fire - Silverstein
 results <- lapply(
     seq_along(data), 
     function(i) {
@@ -52,7 +53,6 @@ results <- lapply(
                         item == conditions$Var1[j],
                         condition == conditions$Var2[j]
                     ) |>
-                    dplyr::mutate(ar_arima = ifelse(ar_arima < 0, NA, ar_arima)) |>
                     dplyr::filter(!is.na(ar_arima)) |>
 
                     # Ensure that only the relevant ones are used, also within
@@ -129,6 +129,10 @@ for(i in seq_along(comparisons)) {
 
   cat("  short to long: ")
   cat(sum(comparisons[[i]]$continuous_s2l_p <= 0.05))
+  cat("\n")
+
+  cat("  long to short: ")
+  cat(sum(comparisons[[i]]$continuous_l2s_p <= 0.05))
   cat("\n\n")
 
   # Inspection of the Cohen's d's per dataset
@@ -139,6 +143,10 @@ for(i in seq_along(comparisons)) {
 
   cat("  short to long: ")
   cat(range(comparisons[[i]]$continuous_s2l_d[comparisons[[i]]$continuous_s2l_p < 0.05]))
+  cat("\n")
+
+  cat("  long to short: ")
+  cat(range(comparisons[[i]]$continuous_l2s_d[comparisons[[i]]$continuous_l2s_p < 0.05]))
   cat("\n\n")
 }
 
@@ -214,6 +222,61 @@ demo |>
 ####################
 # DEJONCKHEERE
 
+# Note that these data are not available online and only upon request. Hence, 
+# the code here will not work.
+demo <- read.csv(
+  here::here(
+    "data", 
+    "DEJONCKHEERE DEMOGRAPHICS.csv"
+  ),
+  sep = ";",
+  header = FALSE
+)[-c(1:3), ] |>
+  `colnames<-` (c("date", "id", "gender", "age", "compliance")) |>
+  dplyr::filter(compliance != "")
+
+# Unfortunately, the id's in the demographic file do not match those of the 
+# raw data. Hence, we need to figure out who is who in both files. We will do 
+# this based on the dates indicated in the demographic file and the dates of 
+# the informed consent provided in the raw datafile.
+#
+# Read in the raw data and retain only those rows in which the informed consent
+# columns have values
+data <- read.csv(
+  here::here(
+    "data", 
+    "DEJONCKHEERE.csv"
+  ),
+  sep = ";"
+) |>
+  dplyr::filter(
+    grepl("IC", questionListName, fixed = TRUE),
+    !is.na(consent_5_yesno)
+  ) |>
+  dplyr::select(
+    connectionId,
+    timeStampStart
+  ) |>
+  `colnames<-` (c("id", "time_start"))
+
+# Transform the time stamp to an actual date in the raw dataset and delete a 
+# double row for remaining participants
+data <- data |>
+  dplyr::mutate(
+    time_start = lubridate::as_datetime(time_start)
+  ) |>
+  dplyr::group_by(id) |>
+  dplyr::summarize(
+    time_start = time_start[1]
+  ) |>
+  dplyr::ungroup() 
+
+# Assume that putting the ids in ascending order in both datasets matches the 
+# id's across datasets. The dates match up between both files, but within dates
+# we don't have sufficient information within the demographic dataset to make 
+# this inference (outside of common sense)
+demo$id <- data$id
+
 # Read in the DEJONCKHEERE results and filter based on the 
 data <- readRDS(
   here::here(
@@ -226,12 +289,38 @@ data <- readRDS(
   dplyr::ungroup() |>
   dplyr::filter(to_keep) 
 
+# Show the demographics of those participants kept in the data
+demo <- demo |>
+  dplyr::filter(id %in% data$id) |> 
+  dplyr::mutate(age = as.numeric(age))
+
+table(demo$gender) / nrow(demo)
+
+mean(demo$age)
+sd(demo$age)
+
+
 
 
 ####################
 # CLOOS
 
-# Read in the CLOOS results and filter based on the 
+# Note that these data are not available online and only upon request. Hence, 
+# the code here will not work.
+demo <- read.csv(
+  here::here(
+    "data", 
+    "CLOOS DEMOGRAPHICS.csv"
+  ),
+  sep = ";"
+) |>
+  dplyr::select(
+    id,
+    UserLanguage:Nationality
+  ) |>
+  `colnames<-` (c("id", "language", "age", "birthday", "gender", "nationality"))
+
+# Read in the CLOOS results and filter based on the number of usable pairs
 data <- readRDS(
   here::here(
     "results", 
@@ -243,12 +332,20 @@ data <- readRDS(
   dplyr::ungroup() |>
   dplyr::filter(to_keep) 
 
-data <- read.csv(
-  here::here(
-    "data",
-    "CLOOS.csv"
-  )
-)
+# Rework the ids of the data so that they match up with those of the demographic
+# dataset
+data <- data |>
+  dplyr::mutate(id = as.numeric(id))
+
+# Show the demographics of those participants kept in the data
+demo <- demo |>
+  dplyr::filter(id %in% data$id) |> 
+  dplyr::mutate(age = as.numeric(age))
+
+table(demo$gender) / nrow(demo)
+
+mean(demo$age)
+sd(demo$age)
 
 
 
@@ -419,3 +516,92 @@ results <- lapply(
 )
 results <- do.call("rbind", results)
 View(results)
+
+
+
+################################################################################
+# NEGATIVE AUTOCORRELATION
+################################################################################
+
+# Load all estimates
+data <- list(
+  "BUCHNER" = readRDS(
+    here::here(
+      "results", 
+      "BUCHNER_estimates.Rds"
+    )
+  ),
+  "DEJONCKHEERE" = readRDS(
+    here::here(
+      "results", 
+      "DEJONCKHEERE_estimates.Rds"
+    )
+  ),
+  "CLOOS" = readRDS(
+    here::here(
+      "results", 
+      "CLOOS_estimates.Rds"
+    )
+  )
+)
+
+# Loop over all datasets and identify the number of negative autocorrelations 
+# per item per condition
+results <- lapply(
+  seq_along(data),
+  function(i) {
+    # Only retain those participants who have more than 20 usable pairs. 
+    # Furthermore delete missing values
+    selected <- data[[i]] |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(to_keep = min(number_usable_pairs) >= 20) |>
+      dplyr::ungroup() |>
+      dplyr::filter(to_keep) |>
+      dplyr::filter(!is.na(ar_arima))
+
+    # Summarize number of negative autocorrelations for each dataset separately
+    # and add a percentage to this
+    selected <- selected |>
+      dplyr::group_by(condition, item) |>
+      dplyr::summarize(
+        frequency = sum(ar_arima < 0),
+        percentage = frequency / length(ar_arima),
+        total = length(ar_arima)
+      )
+
+    # Return as is
+    return(selected)
+  }
+)
+
+# Summarize these results and display them
+summarized <- lapply(
+  seq_along(results),
+  function(i) results[[i]] |>
+    dplyr::ungroup() |>
+    dplyr::summarize(
+      data = names(data)[i],
+      mean = mean(percentage),
+      sd = sd(percentage),
+      min = min(percentage),
+      max = max(percentage)
+    )
+)
+summarized <- do.call("rbind", summarized)
+
+# Perform a t-test to find out whether there is a difference between conditions 
+# regarding negative autoregressive effects
+t.test(
+  results[[1]]$percentage[results[[1]]$condition == "short_interval"],
+  results[[1]]$percentage[results[[1]]$condition == "long_interval"]
+)
+t.test(
+  results[[2]]$percentage[results[[2]]$condition == "short_interval"],
+  results[[2]]$percentage[results[[2]]$condition == "long_interval"],
+  paired = TRUE
+)
+t.test(
+  results[[3]]$percentage[results[[3]]$condition == "short_interval"],
+  results[[3]]$percentage[results[[3]]$condition == "long_interval"],
+  paired = TRUE
+)
