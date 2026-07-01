@@ -1,7 +1,11 @@
 *_unprocessed*
+*esm_*
+*dataset_*
 figures/
-data/
 figure.R
 results/*.txt
 *DS_Store
 *copy*
+depr*
+pnas*
+*DEMO*
