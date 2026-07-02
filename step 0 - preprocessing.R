@@ -95,17 +95,6 @@ data <- dplyr::bind_rows(data_a, data_b) |>
   ) |>
   dplyr::rename(time_interval = delta)
 
-# Delete all participants that do not have a sufficient number of valid pairs 
-# that can be made with the data.
-data <- data |>
-  dplyr::group_by(id) |>
-  dplyr::mutate(
-    n_valid_pairs = sum(!is.na(time_interval))
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::filter(n_valid_pairs >= min_pairs) |> 
-  dplyr::select(-n_valid_pairs)
-
 # Create lagged data to be used for the estimation.
 data <- data |>
   dplyr::group_by(id) |>
@@ -166,6 +155,22 @@ data <- data |>
     lagged, 
     by = c("id", "beep_number", "time", "time_interval", "condition", "item")
   )
+
+# Delete all participants that do not have a sufficient number of valid pairs 
+# that can be made with the data.
+data <- data |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    valid_pair = !is.na(response + response_lag)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id, condition, item) |>
+  dplyr::mutate(
+    n_valid_pairs = sum(valid_pair)
+  ) |> 
+  dplyr::ungroup() |>
+  dplyr::filter(n_valid_pairs >= min_pairs) |> 
+  dplyr::select(-n_valid_pairs, -valid_pair)
 
 # Save the processed data in the corresponding folder
 saveRDS(
@@ -296,23 +301,9 @@ data <- data |>
   dplyr::rename(
     time_interval = delta
   ) |>
-  dplyr::group_by(id) |>
-  dplyr::mutate(
-    n_valid_pairs = sum(!is.na(time_interval)), 
-    .after = time_interval
-  ) |>
-  dplyr::ungroup() |> 
   dplyr::mutate(condition = "long_interval") |>
   dplyr::select(-row_id, -new_row_needed) |>
-  dplyr::bind_rows(followup)
-
-# Filter out participants who do not have the prespecified number of pairs in 
-# every condition. 
-data <- data |>
-  dplyr::group_by(id) |>
-  dplyr::mutate(to_keep = all(n_valid_pairs >= min_pairs)) |>
-  dplyr::ungroup() |>
-  dplyr::filter(to_keep) |>
+  dplyr::bind_rows(followup) |>
   dplyr::select(
     id, 
     condition, 
@@ -384,6 +375,30 @@ data <- data |>
     lagged, 
     by = c("id", "beep_number", "time", "time_interval", "condition", "item")
   )
+
+# Delete all participants that do not have a sufficient number of valid pairs 
+# that can be made with the data. Note that we delete participants when they 
+# don't have sufficient number of useable pairs in both conditions
+data <- data |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    valid_pair = !is.na(response + response_lag)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id, condition, item) |>
+  dplyr::mutate(
+    n_valid_pairs = sum(valid_pair)
+  ) |> 
+  dplyr::ungroup() |>
+  dplyr::filter(n_valid_pairs >= min_pairs) |> 
+  dplyr::select(-n_valid_pairs, -valid_pair) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    both_conditions_satisfied = all(c("short_interval", "long_interval") %in% condition)
+  ) |> 
+  dplyr::ungroup() |>
+  dplyr::filter(both_conditions_satisfied) |>
+  dplyr::select(-both_conditions_satisfied)
 
 # Save the processed data in the corresponding folder
 saveRDS(
@@ -506,20 +521,6 @@ data <- data |>
   ) |>
   dplyr::select(-date, -connectionId)
 
-# Delete all participants that do not have a sufficient number of valid pairs 
-# that can be made with the data.
-data <- data |>
-  dplyr::group_by(id, condition) |>
-  dplyr::mutate(
-    n_valid_pairs = sum(!missed)
-  ) |>
-  dplyr::ungroup() |> 
-  dplyr::group_by(id) |>
-  dplyr::mutate(to_keep = all(n_valid_pairs >= min_pairs)) |>
-  dplyr::ungroup() |>
-  dplyr::filter(to_keep) |>
-  dplyr::select(-n_valid_pairs, -missed, -to_keep, -meas_no) 
-
 # Add "beep numbers" to the data.frame to allow disambiguation in the next step.
 # Note that these are not the actual beep numbers: Instead, they represent the 
 # number for the ordered observations and imputed NAs in the dataset
@@ -574,6 +575,30 @@ data <- data |>
       "short_interval"
     )
   )
+
+# Delete all participants that do not have a sufficient number of valid pairs 
+# that can be made with the data. Note that we delete participants when they 
+# don't have sufficient number of useable pairs in both conditions
+data <- data |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    valid_pair = !is.na(response + response_lag)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id, condition, item) |>
+  dplyr::mutate(
+    n_valid_pairs = sum(valid_pair)
+  ) |> 
+  dplyr::ungroup() |>
+  dplyr::filter(n_valid_pairs >= min_pairs) |> 
+  dplyr::select(-n_valid_pairs, -valid_pair) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    both_conditions_satisfied = all(c("short_interval", "long_interval") %in% condition)
+  ) |> 
+  dplyr::ungroup() |>
+  dplyr::filter(both_conditions_satisfied) |>
+  dplyr::select(-both_conditions_satisfied)
 
 # Save the processed data in the corresponding folder
 saveRDS(
