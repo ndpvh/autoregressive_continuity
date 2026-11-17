@@ -43,35 +43,6 @@ type <- c(
   "continuous_l2s"
 )
 
-# Define the limits for the plots. Based on the 99% confidence interval 
-# of the estimates, ensuring some space is left (as the 95%CI is plotted)
-estimate <- lapply(
-  data,
-  function(x) x[, paste(type, "d", sep = "_")] |>
-    unlist() |>
-    as.numeric() 
-) |>
-  unlist() |>
-  as.numeric()
-se <- lapply(
-  data,
-  function(x) x[, paste(type, "dvar", sep = "_")] |>
-  unlist() |>
-  as.numeric() |>
-  sqrt()
-) |>
-  unlist() |>
-  as.numeric()
-bounds <- c(
-  estimate - 2.576 * se, 
-  estimate + 2.567 * se
-)
-
-# Derive the limits themselves. Round the alims to 0.5 precision, allowing for 
-# a cleaner number of steps in the plots
-alims <- round(range(bounds) * 2, 0) / 2
-xlims <- alims + c(-0.5, 0.5) * diff(alims)
-
 # Loop over the data and run the meta-analysis
 set.seed(345) # Moneen - The Long Count
 for(i in seq_along(data)) {
@@ -108,45 +79,6 @@ for(i in seq_along(data)) {
         )
       )
     )
-
-    # Create forest plots that summarize the meta-analysis
-    pdf(
-      here::here(
-        "figures", 
-        paste0(
-          "forest_", 
-          names(data)[i], 
-          "_meta-", 
-          type[j], 
-          ".pdf"
-        )
-      ),
-      width = 8, 
-      height = 5 * nrow(data_ij) / 19 + 1.5
-    )
-
-    par(mar = rep(2, 4))
-
-    metafor::forest(
-      result, 
-      xlab = "Cohen's d",
-      slab = data_ij$item, 
-      header = "Item",
-      alim = alims,
-      xlim = xlims,
-      refline = ifelse(
-        0 > lims[1] & 0 < lims[2],
-        0,
-        NA
-      ),
-      width = c(0.1, 0.8, 0.1),
-      psize = 1,
-      cex = 1,
-      digits = 1,
-      steps = 8
-    )
-
-    dev.off()
   }
 }
 
