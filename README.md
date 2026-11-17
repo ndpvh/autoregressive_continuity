@@ -1,10 +1,15 @@
 # Continuity Revisited
 
-This repository contains relevant data and code for the preprint "Continuity revisited: The empirical relationship between sampling rate and temporal dependence" submitted by Niels Vanhasbroeck, Henry Lo, Simran K. Johal, Lisa Peeters, Laura F. Bringmann, Marieke A. Helmich, Manuel Rein, Peer-Ole Jacobsen, Leonie Cloos, and Anabel Büchner. In this project, we investigate whether temporal dependence between psychological variables - as measured through the experience sampling method - depends on the sampling rate employed within the study. Following the idea that we are measuring a continuous-time process, we should find that the longer the time between observations, the less these observations will be associated with each other. 
+This repository contains relevant data and code for the preprint "Continuity revisited: The empirical relationship between sampling rate and temporal dependence" submitted by Niels Vanhasbroeck, Henry Lo, Simran K. Johal, Lisa Peeters, Laura F. Bringmann, Manuel Rein, Peer-Ole Jacobsen, Leonie Cloos, and Anabel Büchner. In this project, we investigate whether temporal dependence between psychological variables - as measured through the experience sampling method - relates exponentially with the sampling rate employed within the study, a prediction derived from the often-used linear continuous-time Ornstein-Uhlenbeck model. We test two central assumptions:
 
-For details on the data and analysis procedure we used to answer our question, we refer the interested reader to the preprint of our article ([LINK]). In this README, we'll instead detail the structure of the project.
+- _dependence assumption:_ Discrete-time temporal dependence relates to the sampling rate employed in a study;
+- _exponential assumption:_ This relationship is exponential in nature.
 
-The central premise of the project and its preliminary results came out of a hackaton organized by the Measurement is the New Black consortium (https://mitnb.org).
+To answer our questions, we used previously collected data from three experience sampling studies in which the sampling rate was manipulated, either between-subject (Büchner et al., preprint) or within-subject (Cloos et al., 2024; Dejonckheere et al., 2022). Our main analyses therefore target the size of discrete-time temporal dependence across the two conditions, hereafter the long interval and short interval condition (reflecting the relative length of the time between observations).
+
+For more details on the data and analysis procedure we used to answer our question, we refer the interested reader to the preprint of our article ([LINK]). In this README, we'll instead detail how to reproduce the central results of the project.
+
+This project and its preliminary results were born out of a hackaton organized by the Measurement is the New Black consortium (https://mitnb.org) and led by Niels Vanhasbroeck, Leonie Cloos, and Anabel Büchner.
 
 
 
@@ -13,22 +18,33 @@ The central premise of the project and its preliminary results came out of a hac
 The project consists of several folders and scripts that together define the analyses performed on the data. The folders contain the following information:
 
 - `data`: Contains the raw data used to answer our research questions. We named the data after the original authors. For more information on these data, we refer the interested reader to the relevant publications around these data (Büchner et al., preprint; Cloos et al., 2024; Dejonckheere et al., 2022). Note that not all data is available for free use (see License);
-- `data_preprocessed`: Contains the preprocessed data after running script `step 0 - preprocessing.R`, ensuring that all of them contain the relevant information and have a similar data structure. These preprocessed data are used in our analyses;
+- `data_preprocessed`: Contains the preprocessed data after running script `step 0 - preprocessing.R`, ensuring that all of them contain the relevant information and have a similar data structure. These preprocessed data are used in the next steps of our analyses;
 - `results`: Contains the results from the various scripts. All results make mention of the dataset (`BUCHNER`, `CLOOS`, or `DEJONCKHEERE`) and the type of results they contain, specifically:
     - `estimates`: Contains the estimates of the autoregressive effects per person per item, as computed in `step 1 - estimation.R`;
     - `comparison`: Contains the results of the comparison of these autoregressive effects across conditions and with a continuous-time prediction of what this autoregressive effect should look like, as computed in `step 2 - comparison.R`;
-    - `meta-...`: Contains the results of the meta-analyses performed on the comparison results, aggregating across items, as computed in `step 4 - meta analysis.R`. We distinguish between three types of comparisons, namely a comparison between conditions (`condition`), a comparison with the continuous-time estimate for the long intervals (`continuous_s2l`, reported in the preprint), and the same comparison but for the short intervals (`continuous_l2s`).
-- `utility`: Contains several scripts with helper functions used in the various analysis scripts, typically called through `source()`;
-- `manuscript`: Contains several things that were relevant for the manuscript when it was under preparation. Most interesting to the reader may be the script `manuscript.R` which summarizes all relevant results that were included in 
-the manuscript.
+    - `meta-...`: Contains the results of the meta-analyses performed on the comparison results, aggregating across items, as computed in `step 4 - meta analysis.R`. We distinguish between three types of comparisons, namely a comparison between conditions targeting the _dependence assumption_ (`condition`) and two comparisons of temporal dependence with a continuous-time prediction thereof, one for the long interval condition (`continuous_s2l`, reported in the preprint) and one for the short intervals (`continuous_l2s`).
+- `utility`: Contains scripts with helper functions used in the various analysis scripts. It is typically called through `source()` at the top of the different analysis scripts;
+- `manuscript`: Contains scripts that were relevant for the manuscript when it was under preparation. Most interesting to the reader may be the script `manuscript.R` which summarizes all results that were included in the manuscript.
 
-The scripts that are included at the top level have the following function:
+The scripts that are included at the top level do the following:
 
 - `step 0 - preprocessing.R`: Preprocesses the raw data into data that can be used for the estimation;
-- `step 1 - estimation.R`: Uses the preprocessed data to estimate lag-1 autoregressive effects for each of the items for each person within each condition (high or low sampling rate);
-- `step 2 - comparison.R`: Uses the estimates and compares them (a) across condition and (b) to a continuous-time prediction derived from the Ornstein-Uhlenbeck model, the continuous-time variant of the autoregressive model often employed in the psychological literature;
-- `step 3 - time intervals.R`: Compares the time between measurements across conditions, serving as a manipulation check;
+- `step 1 - estimation.R`: Uses the preprocessed data to estimate lag-1 autoregressive effects for each of item and person within each condition;
+- `step 2 - comparison.R`: Uses the estimates and compares them (a) across condition and (b) to a continuous-time prediction derived from the Ornstein-Uhlenbeck model;
+- `step 3 - time intervals.R`: Compares the time between measurements across conditions. Primary serves as a manipulation check;
 - `step 4 - meta analysis.R`: Aggregates the item-specific results into a comprehensive estimate of the effect through a meta-analysis.
+
+
+
+## Getting started
+
+If you wish to get started with these data, you can clone the repository by opening up the terminal, moving to the folder where you want to save this repository, and calling:
+
+```
+git clone https://github.com/ndpvh/autoregressive_continuity.git
+```
+
+Given that we provide the results of our study in this repository, we suggest you start with the R-scripts in the `manuscript` folder. Here, `manuscript.R` reproduces the results of the manuscript and Supplementary Materials while `figures.R` reproduces the figures presented in both. Afterwards, you can do a deep-dive in how we performed our analyses by looking at the different `step x` files and the functions they call in the folder `utility`.
 
 
 
